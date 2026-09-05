@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { deleteMemory } from './memory.js';
 
 export interface RetentionSettings {
   defaultDurationDays: number;
@@ -119,7 +120,7 @@ export function deleteExpiredMemories(
   const byType: Record<string, number> = {};
 
   for (const mem of expired) {
-    db.prepare('DELETE FROM memories WHERE id = ?').run(mem.id);
+    deleteMemory(db, mem.id);
     byType[mem.type] = (byType[mem.type] ?? 0) + 1;
   }
 

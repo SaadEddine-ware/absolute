@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS memories (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (parent_id) REFERENCES memories(id),
-    FOREIGN KEY (goal_id) REFERENCES goals(id),
+    FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE SET NULL,
     FOREIGN KEY (session_id) REFERENCES sessions(id)
 );
 
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS goals (
     session_id TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (parent_goal_id) REFERENCES goals(id),
+    FOREIGN KEY (parent_goal_id) REFERENCES goals(id) ON DELETE CASCADE,
     FOREIGN KEY (session_id) REFERENCES sessions(id)
 );
 
