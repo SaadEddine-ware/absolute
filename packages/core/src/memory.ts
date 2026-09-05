@@ -127,8 +127,65 @@ export function deleteMemory(
   db: Database.Database,
   id: string
 ): boolean {
+  db.prepare('DELETE FROM memory_vectors WHERE memory_id = ?').run(id);
   const result = db.prepare('DELETE FROM memories WHERE id = ?').run(id);
   return result.changes > 0;
+}
+
+export function drillDownMemory(
+  db: Database.Database,
+  memoryId: string
+): { memory: Memory; children: Memory[] } {
+  const memory = getMemory(db, memoryId);
+  if (!memory) throw new Error('Memory not found');
+
+  const children = getMemoriesByParent(db, memoryId);
+  return { memory, children };
+}
+
+export function searchByKeywords(
+  db: Database.Database,
+  sessionId: string,
+  keywords: string[]
+): Memory[] {
+  if (keywords.length === 0) return [];
+
+  const conditions = keywords.map(() => 'keys LIKE ?').join(' OR ');
+  const params = keywords.map((k) => `%${k}%`);
+
+  return db
+    .prepare(
+      `SELECT * FROM memories
+       WHERE session_id = ? AND (${conditions})
+       ORDER BY importance DESC`
+    )
+    .all(sessionId, ...params) as Memory[];
+}
+
+export function loadByImportance(
+  db: Database.Database,
+  sessionId: string,
+  maxTokens: number = 2000
+): Memory[] {
+  const memories = db
+    .prepare(
+      `SELECT * FROM memories
+       WHERE session_id = ?
+       ORDER BY importance DESC, created_at DESC`
+    )
+    .all(sessionId) as Memory[];
+
+  let tokenCount = 0;
+  const selected: Memory[] = [];
+
+  for (const memory of memories) {
+    const memTokens = memory.tokens_est || 0;
+    if (tokenCount + memTokens > maxTokens) break;
+    selected.push(memory);
+    tokenCount += memTokens;
+  }
+
+  return selected;
 }
 
 export function loadSessionHeaders(

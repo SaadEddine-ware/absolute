@@ -39,7 +39,38 @@ export {
   deleteMemory,
   loadSessionHeaders,
   formatContextForLLM,
+  drillDownMemory,
+  searchByKeywords,
+  loadByImportance,
 } from './memory.js';
+
+export {
+  createGoal,
+  getGoal,
+  getGoalsBySession,
+  getGoalsByParent,
+  getActiveGoals,
+  updateGoal,
+  deleteGoal,
+  getGoalHierarchy,
+  completeGoal,
+} from './goals.js';
+
+export {
+  findLinkedMemories,
+  createMemoryThread,
+  linkAcrossSessions,
+  getMemoryContext,
+} from './cross-session.js';
+
+export {
+  getRetentionSettings,
+  updateRetentionSettings,
+  getExpiredMemories,
+  deleteExpiredMemories,
+  getMemoryAge,
+} from './retention.js';
+export type { RetentionSettings } from './retention.js';
 
 export { migrateEmbeddings } from './migration.js';
 export type { MigrationResult } from './migration.js';
