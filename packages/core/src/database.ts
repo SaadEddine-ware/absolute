@@ -1,0 +1,82 @@
+import Database from 'better-sqlite3';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { v4 as uuid } from 'uuid';
+import { load as loadSqliteVecExt } from 'sqlite-vec';
+import type { EmbeddingProvider } from './embedding/types.js';
+import type { EmbeddingMetadata } from './types.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+export interface DatabaseConfig {
+  dbPath: string;
+  embeddingProvider: EmbeddingProvider;
+}
+
+export interface AbsoluteDatabase {
+  db: Database.Database;
+  embeddingProvider: EmbeddingProvider;
+}
+
+export function openDatabase(config: DatabaseConfig): AbsoluteDatabase {
+  const db = new Database(config.dbPath);
+
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+
+  loadSqliteVec(db);
+  runMigrations(db);
+  validateEmbeddingMetadata(db, config.embeddingProvider);
+
+  return { db, embeddingProvider: config.embeddingProvider };
+}
+
+function loadSqliteVec(db: Database.Database): void {
+  try {
+    loadSqliteVecExt(db);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('already loaded')) return;
+    console.error('Failed to load sqlite-vec extension:', msg);
+    console.error('Install it: npm install sqlite-vec');
+    process.exit(1);
+  }
+}
+
+function runMigrations(db: Database.Database): void {
+  const schema = readFileSync(join(__dirname, 'schema.sql'), 'utf-8');
+  db.exec(schema);
+}
+
+function validateEmbeddingMetadata(
+  db: Database.Database,
+  provider: EmbeddingProvider
+): void {
+  const row = db
+    .prepare('SELECT model_id, dimensions FROM embedding_metadata WHERE id = 1')
+    .get() as EmbeddingMetadata | undefined;
+
+  if (!row) {
+    db.prepare(
+      'INSERT INTO embedding_metadata (id, model_id, dimensions) VALUES (1, ?, ?)'
+    ).run(provider.modelId, provider.dimensions);
+    return;
+  }
+
+  if (row.model_id !== provider.modelId) {
+    console.error(
+      `\nEmbedding provider changed from "${row.model_id}" to "${provider.modelId}".\n` +
+      `Run \`absolute migrate embeddings\` before continuing.\n`
+    );
+    process.exit(1);
+  }
+}
+
+export function generateId(): string {
+  return uuid();
+}
+
+export function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}

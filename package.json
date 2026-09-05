@@ -1,0 +1,24 @@
+{
+  "name": "absolute",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "build:core": "npm run build -w packages/core",
+    "build:cli": "npm run build -w packages/cli",
+    "dev": "npm run dev -w packages/cli",
+    "start": "node packages/cli/dist/index.js",
+    "typecheck": "npm run typecheck --workspaces",
+    "clean": "rm -rf packages/*/dist"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "sqlite-vec": "^0.1.9"
+  }
+}
