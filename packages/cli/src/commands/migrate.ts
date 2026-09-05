@@ -22,7 +22,7 @@ export function migrateCommand(program: Command): void {
         modelId: config.memory?.embeddingModelId,
       });
 
-      const { db } = openDatabase({ dbPath: getDbPath(), embeddingProvider: provider });
+      const { db } = openDatabase({ dbPath: getDbPath(), embeddingProvider: provider, skipEmbeddingValidation: true });
 
       const memories = db.prepare('SELECT COUNT(*) as count FROM memories').get() as { count: number };
       const goals = db.prepare('SELECT COUNT(*) as count FROM goals').get() as { count: number };
@@ -36,6 +36,9 @@ export function migrateCommand(program: Command): void {
       console.log(`  Memories re-embedded: ${result.memoriesReembed}`);
       console.log(`  Goals re-embedded: ${result.goalsReembed}`);
       console.log(`  Provider: ${result.oldModelId} -> ${result.newModelId}`);
+      if (result.dimensionsChanged) {
+        console.log(`  Dimensions changed: vec0 tables recreated`);
+      }
       console.log(`  Adaptive threshold reset to 0.6`);
 
       db.close();

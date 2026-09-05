@@ -12,6 +12,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export interface DatabaseConfig {
   dbPath: string;
   embeddingProvider: EmbeddingProvider;
+  skipEmbeddingValidation?: boolean;
 }
 
 export interface AbsoluteDatabase {
@@ -27,7 +28,9 @@ export function openDatabase(config: DatabaseConfig): AbsoluteDatabase {
 
   loadSqliteVec(db);
   runMigrations(db);
-  validateEmbeddingMetadata(db, config.embeddingProvider);
+  if (!config.skipEmbeddingValidation) {
+    validateEmbeddingMetadata(db, config.embeddingProvider);
+  }
 
   return { db, embeddingProvider: config.embeddingProvider };
 }

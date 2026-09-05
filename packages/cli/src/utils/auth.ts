@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join } from 'node:path';
 import { homedir } from 'node:os';
 
 const AUTH_DIR = join(homedir(), '.config', 'absolute', 'auth');
@@ -26,8 +26,12 @@ export async function storeCredential(
 ): Promise<void> {
   const keytar = await tryKeytar();
   if (keytar) {
-    await keytar.setPassword('absolute', provider, key);
-    return;
+    try {
+      await keytar.setPassword('absolute', provider, key);
+      return;
+    } catch {
+      // keytar present but non-functional (no keyring daemon) — fall through
+    }
   }
 
   mkdirSync(AUTH_DIR, { recursive: true });
@@ -52,8 +56,12 @@ export async function getCredential(
 ): Promise<string | null> {
   const keytar = await tryKeytar();
   if (keytar) {
-    const key = await keytar.getPassword('absolute', provider);
-    if (key) return key;
+    try {
+      const key = await keytar.getPassword('absolute', provider);
+      if (key) return key;
+    } catch {
+      // keytar present but non-functional (no keyring daemon) — fall through
+    }
   }
 
   if (!existsSync(AUTH_FILE)) return null;
@@ -66,7 +74,11 @@ export async function deleteCredential(
 ): Promise<boolean> {
   const keytar = await tryKeytar();
   if (keytar) {
-    await keytar.deletePassword('absolute', provider);
+    try {
+      await keytar.deletePassword('absolute', provider);
+    } catch {
+      // keytar present but non-functional — fall through to file-based
+    }
   }
 
   if (!existsSync(AUTH_FILE)) return false;

@@ -6,6 +6,7 @@ export interface MigrationResult {
   goalsReembed: number;
   oldModelId: string;
   newModelId: string;
+  dimensionsChanged: boolean;
 }
 
 export async function migrateEmbeddings(
@@ -17,6 +18,8 @@ export async function migrateEmbeddings(
     .get() as { model_id: string; dimensions: number } | undefined;
 
   const oldModelId = oldMeta?.model_id ?? 'unknown';
+  const oldDimensions = oldMeta?.dimensions ?? 0;
+  const dimensionsChanged = oldDimensions !== provider.dimensions;
 
   const memories = db
     .prepare('SELECT id, content FROM memories')
@@ -26,8 +29,25 @@ export async function migrateEmbeddings(
     .prepare('SELECT id, description FROM goals')
     .all() as { id: string; description: string }[];
 
-  db.exec('DELETE FROM memory_vectors');
-  db.exec('DELETE FROM goal_vectors');
+  if (dimensionsChanged) {
+    db.exec('DROP TABLE IF EXISTS memory_vectors');
+    db.exec('DROP TABLE IF EXISTS goal_vectors');
+    db.exec(
+      `CREATE VIRTUAL TABLE memory_vectors USING vec0(
+        memory_id TEXT PRIMARY KEY,
+        embedding FLOAT[${provider.dimensions}]
+      )`
+    );
+    db.exec(
+      `CREATE VIRTUAL TABLE goal_vectors USING vec0(
+        goal_id TEXT PRIMARY KEY,
+        embedding FLOAT[${provider.dimensions}]
+      )`
+    );
+  } else {
+    db.exec('DELETE FROM memory_vectors');
+    db.exec('DELETE FROM goal_vectors');
+  }
 
   const insertMemoryVec = db.prepare(
     'INSERT INTO memory_vectors (memory_id, embedding) VALUES (?, ?)'
@@ -76,5 +96,6 @@ export async function migrateEmbeddings(
     goalsReembed: goalCount,
     oldModelId,
     newModelId: provider.modelId,
+    dimensionsChanged,
   };
 }
