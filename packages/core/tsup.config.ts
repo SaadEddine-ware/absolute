@@ -1,5 +1,5 @@
 import { defineConfig } from 'tsup';
-import { copyFileSync } from 'node:fs';
+import { cpSync } from 'node:fs';
 
 export default defineConfig({
   entry: ['src/index.ts'],
@@ -9,6 +9,6 @@ export default defineConfig({
   sourcemap: true,
   splitting: false,
   onSuccess: async () => {
-    copyFileSync('src/schema.sql', 'dist/schema.sql');
+    cpSync('src/migrations', 'dist/migrations', { recursive: true });
   },
 });

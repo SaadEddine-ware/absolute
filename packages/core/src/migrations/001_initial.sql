@@ -1,4 +1,12 @@
 -- ============================================================
+-- SCHEMA MIGRATIONS TRACKING
+-- ============================================================
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    id INTEGER PRIMARY KEY,
+    applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
 -- CORE TABLES
 -- ============================================================
 
@@ -16,7 +24,7 @@ CREATE TABLE IF NOT EXISTS memories (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (parent_id) REFERENCES memories(id),
-    FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE SET NULL,
+    FOREIGN KEY (goal_id) REFERENCES goals(id),
     FOREIGN KEY (session_id) REFERENCES sessions(id)
 );
 
@@ -31,7 +39,7 @@ CREATE TABLE IF NOT EXISTS goals (
     session_id TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (parent_goal_id) REFERENCES goals(id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_goal_id) REFERENCES goals(id),
     FOREIGN KEY (session_id) REFERENCES sessions(id)
 );
 

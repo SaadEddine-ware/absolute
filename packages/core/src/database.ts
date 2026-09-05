@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { v4 as uuid } from 'uuid';
@@ -48,8 +48,54 @@ function loadSqliteVec(db: Database.Database): void {
 }
 
 function runMigrations(db: Database.Database): void {
-  const schema = readFileSync(join(__dirname, 'schema.sql'), 'utf-8');
-  db.exec(schema);
+  db.pragma('foreign_keys = OFF');
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      id INTEGER PRIMARY KEY,
+      applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  const applied = db
+    .prepare('SELECT id FROM schema_migrations ORDER BY id DESC LIMIT 1')
+    .get() as { id: number } | undefined;
+  const highestApplied = applied?.id ?? 0;
+
+  const migrationsDir = join(__dirname, 'migrations');
+  let files: string[];
+  try {
+    files = readdirSync(migrationsDir)
+      .filter((f) => f.endsWith('.sql'))
+      .sort();
+  } catch {
+    files = [];
+  }
+
+  for (const file of files) {
+    const match = file.match(/^(\d+)_(.+)\.sql$/);
+    if (!match) continue;
+
+    const migrationId = parseInt(match[1], 10);
+    if (migrationId <= highestApplied) continue;
+
+    const sql = readFileSync(join(migrationsDir, file), 'utf-8');
+    console.log(`Applying migration ${match[1]}: ${match[2]}`);
+
+    db.exec('BEGIN TRANSACTION');
+    try {
+      db.exec(sql);
+      db.prepare('INSERT INTO schema_migrations (id) VALUES (?)').run(migrationId);
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`Migration ${file} failed: ${msg}`);
+      process.exit(1);
+    }
+  }
+
+  db.pragma('foreign_keys = ON');
 }
 
 function validateEmbeddingMetadata(
