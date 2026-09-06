@@ -5,15 +5,13 @@ import {
   getSession,
   getSessions,
   deleteSession,
-  CloudflareProvider,
 } from '@absolute/core';
 import { loadConfig, getDbPath } from '../utils/config.js';
+import { createAnyProvider } from '../utils/embedding.js';
 
 function getDb() {
   const config = loadConfig();
-  const workerUrl = config.memory?.embeddingWorkerUrl ?? 'http://localhost:8787';
-  const provider = new CloudflareProvider({ workerUrl });
-  return openDatabase({ dbPath: getDbPath(), embeddingProvider: provider });
+  return openDatabase({ dbPath: getDbPath(), embeddingProvider: createAnyProvider(config) });
 }
 
 export function sessionCommand(program: Command): void {

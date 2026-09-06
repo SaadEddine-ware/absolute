@@ -16,6 +16,7 @@ import {
 import { loadConfig, saveConfig, getDbPath, type AbsoluteConfig } from '../utils/config.js';
 import { getCredential, storeCredential } from '../utils/auth.js';
 import { confirm, promptPassword } from '../utils/prompt.js';
+import { createAnyProvider } from '../utils/embedding.js';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -339,14 +340,4 @@ function persistConfig(target: WorkerTarget): void {
   }
 
   saveConfig(config);
-}
-
-function createAnyProvider(config: AbsoluteConfig): EmbeddingProvider {
-  const provider = config.memory?.embeddingProvider;
-  if (provider === 'local') {
-    const modelId = config.memory?.embeddingModelId ?? 'bge-base-en-v1.5';
-    return new LocalProvider({ modelId });
-  }
-  const workerUrl = config.memory?.embeddingWorkerUrl ?? 'http://localhost:8787';
-  return new CloudflareProvider({ workerUrl });
 }
