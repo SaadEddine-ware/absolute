@@ -126,8 +126,28 @@ export function deleteGoal(
   db: Database.Database,
   id: string
 ): boolean {
+  const subtreeIds = goalSubtreeIds(db, id);
+  const deleteVector = db.prepare('DELETE FROM goal_vectors WHERE goal_id = ?');
+  for (const goalId of subtreeIds) {
+    deleteVector.run(goalId);
+  }
+
   const result = db.prepare('DELETE FROM goals WHERE id = ?').run(id);
   return result.changes > 0;
+}
+
+function goalSubtreeIds(db: Database.Database, rootId: string): string[] {
+  const rows = db
+    .prepare(
+      `WITH RECURSIVE subtree(id) AS (
+         SELECT id FROM goals WHERE id = ?
+         UNION ALL
+         SELECT g.id FROM goals g JOIN subtree s ON g.parent_goal_id = s.id
+       )
+       SELECT id FROM subtree`
+    )
+    .all(rootId) as { id: string }[];
+  return rows.map((r) => r.id);
 }
 
 export function getGoalHierarchy(

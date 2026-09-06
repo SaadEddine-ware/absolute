@@ -127,9 +127,28 @@ export function deleteMemory(
   db: Database.Database,
   id: string
 ): boolean {
-  db.prepare('DELETE FROM memory_vectors WHERE memory_id = ?').run(id);
+  const subtreeIds = memorySubtreeIds(db, id);
+  const deleteVector = db.prepare('DELETE FROM memory_vectors WHERE memory_id = ?');
+  for (const memoryId of subtreeIds) {
+    deleteVector.run(memoryId);
+  }
+
   const result = db.prepare('DELETE FROM memories WHERE id = ?').run(id);
   return result.changes > 0;
+}
+
+function memorySubtreeIds(db: Database.Database, rootId: string): string[] {
+  const rows = db
+    .prepare(
+      `WITH RECURSIVE subtree(id) AS (
+         SELECT id FROM memories WHERE id = ?
+         UNION ALL
+         SELECT m.id FROM memories m JOIN subtree s ON m.parent_id = s.id
+       )
+       SELECT id FROM subtree`
+    )
+    .all(rootId) as { id: string }[];
+  return rows.map((r) => r.id);
 }
 
 export function drillDownMemory(
