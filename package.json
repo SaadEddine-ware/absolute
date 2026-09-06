@@ -21,7 +21,7 @@
   "dependencies": {
     "sqlite-vec": "^0.1.9"
   },
-  "devDependencies": {
+  "optionalDependencies": {
     "@rollup/rollup-win32-x64-msvc": "^4.63.1"
   }
 }
