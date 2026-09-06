@@ -9,6 +9,8 @@ export interface AbsoluteConfig {
     embeddingWorkerUrl?: string;
     embeddingProvider?: 'cloudflare' | 'local';
     embeddingModelId?: string;
+    embeddingDimensions?: number;
+    embeddingCacheDir?: string;
     similarityThreshold?: number;
     maxTokensPerSession?: number;
     retentionDays?: number;

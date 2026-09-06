@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { sessionCommand } from './commands/session.js';
 import { configCommand } from './commands/config.js';
 import { migrateCommand } from './commands/migrate.js';
+import { workerCommand } from './commands/worker.js';
 
 const program = new Command();
 
@@ -14,5 +15,6 @@ program
 sessionCommand(program);
 configCommand(program);
 migrateCommand(program);
+workerCommand(program);
 
 program.parse();

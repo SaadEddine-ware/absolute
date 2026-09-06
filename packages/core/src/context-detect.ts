@@ -1,0 +1,276 @@
+import type Database from 'better-sqlite3';
+import type { EmbeddingProvider } from './embedding/types.js';
+import type { MemoryHeader } from './types.js';
+import { getUserSettings, getDecision } from './adaptive-threshold.js';
+import { getActiveGoals } from './goals.js';
+
+export const DEFAULT_TIMEOUT_MS = 500;
+export const DEFAULT_TOP_K = 5;
+
+export type ContextDecision = 'continue' | 'ask' | 'switch';
+
+export interface ContextDetectResult {
+  decision: ContextDecision;
+  similarity: number;
+  threshold: number;
+  relevantMemories: MemoryHeader[];
+  fallback: boolean;
+  reason?: string;
+}
+
+export interface DetectOptions {
+  timeoutMs?: number;
+  sessionId: string;
+  userId?: string;
+  topK?: number;
+}
+
+export async function detectContext(
+  db: Database.Database,
+  provider: EmbeddingProvider,
+  prompt: string,
+  opts: DetectOptions
+): Promise<ContextDetectResult> {
+  const empty: ContextDetectResult = {
+    decision: 'continue',
+    similarity: 0,
+    threshold: getUserSettings(db, opts.userId).similarity_threshold,
+    relevantMemories: [],
+    fallback: true,
+  };
+
+  const queryEmbedding = await embedWithTimeout(
+    provider,
+    prompt,
+    opts.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  ).catch(() => null);
+
+  if (!queryEmbedding) {
+    return { ...empty, reason: 'embedding timeout; proceeding without context check' };
+  }
+
+  const dimensionCheck = checkVectorDimensions(db, provider);
+  if (!dimensionCheck.ok) {
+    return {
+      ...empty,
+      reason: dimensionCheck.error,
+    };
+  }
+
+  const activeGoal = getActiveGoals(db, opts.sessionId)[0];
+  const settings = getUserSettings(db, opts.userId);
+
+  let goalSimilarity = 0;
+  if (activeGoal) {
+    const goalVec = getGoalVector(db, activeGoal.id);
+    if (goalVec && goalVec.length === queryEmbedding.length) {
+      goalSimilarity = cosineSimilarity(queryEmbedding, goalVec);
+    }
+  }
+
+  const decision =
+    activeGoal && goalSimilarity > 0
+      ? getDecision(goalSimilarity, settings.similarity_threshold)
+      : 'continue';
+
+  const relevantMemories = searchSimilarMemories(
+    db,
+    queryEmbedding,
+    opts.sessionId,
+    opts.topK ?? DEFAULT_TOP_K
+  );
+
+  return {
+    decision,
+    similarity: goalSimilarity,
+    threshold: settings.similarity_threshold,
+    relevantMemories,
+    fallback: false,
+  };
+}
+
+export async function embedWithTimeout(
+  provider: EmbeddingProvider,
+  text: string,
+  timeoutMs: number
+): Promise<Float32Array | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('embedding timeout')), timeoutMs);
+  });
+  try {
+    return await Promise.race([provider.embed(text), timeoutPromise]);
+  } catch {
+    return null;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+export function checkVectorDimensions(
+  db: Database.Database,
+  provider: EmbeddingProvider
+): { ok: boolean; error?: string } {
+  const meta = db
+    .prepare('SELECT dimensions FROM embedding_metadata WHERE id = 1')
+    .get() as { dimensions: number } | undefined;
+
+  if (meta && meta.dimensions !== provider.dimensions) {
+    return {
+      ok: false,
+      error:
+        `Vector dimension mismatch: tables use ${meta.dimensions} dims but ` +
+        `provider "${provider.modelId}" returns ${provider.dimensions}. ` +
+        `Run \`absolute migrate embeddings\` to rebuild the vector index.`,
+    };
+  }
+
+  const tableDims = getVec0Dimension(db, 'memory_vectors');
+  if (tableDims && tableDims !== provider.dimensions) {
+    return {
+      ok: false,
+      error:
+        `Vector dimension mismatch: memory_vectors uses ${tableDims} dims but ` +
+        `provider "${provider.modelId}" returns ${provider.dimensions}. ` +
+        `Run \`absolute migrate embeddings\`.`,
+    };
+  }
+
+  return { ok: true };
+}
+
+export function getVec0Dimension(
+  db: Database.Database,
+  tableName: string
+): number | null {
+  const row = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?")
+    .get(tableName) as { sql: string } | undefined;
+
+  if (!row) return null;
+  const match = row.sql.match(/FLOAT\s*\[\s*(\d+)\s*\]/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
+export function getEmbeddingMetadata(
+  db: Database.Database
+): { model_id: string; dimensions: number } | null {
+  const row = db
+    .prepare('SELECT model_id, dimensions FROM embedding_metadata WHERE id = 1')
+    .get() as { model_id: string; dimensions: number } | undefined;
+  return row ?? null;
+}
+
+export function searchSimilarMemories(
+  db: Database.Database,
+  queryEmbedding: Float32Array,
+  sessionId: string,
+  topK: number
+): MemoryHeader[] {
+  try {
+    const rows = db
+      .prepare(
+        `SELECT mv.memory_id as id, m.type, m.content, m.importance, m.tokens_est,
+                (SELECT COUNT(*) FROM memories c WHERE c.parent_id = mv.memory_id) as child_count,
+                mv.distance
+         FROM memory_vectors mv
+         JOIN memories m ON m.id = mv.memory_id
+         WHERE mv.embedding MATCH ?1 AND m.session_id = ?2
+         ORDER BY mv.distance ASC
+         LIMIT ?3`
+      )
+      .all(Buffer.from(queryEmbedding.buffer), sessionId, topK) as Array<
+      MemoryHeader & { memory_id: string; distance: number }
+    >;
+
+    return rows.map(({ memory_id: _id, distance: _d, ...rest }) => rest) as MemoryHeader[];
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('dimension') || msg.includes('different')) {
+      return [];
+    }
+    throw e;
+  }
+}
+
+export function searchSimilarGoals(
+  db: Database.Database,
+  queryEmbedding: Float32Array,
+  opts: { sessionId?: string; topK?: number } = {}
+): Array<{ id: string; description: string; level: string; status: string; distance: number }> {
+  const topK = opts.topK ?? DEFAULT_TOP_K;
+  try {
+    const rows = db
+      .prepare(
+        `SELECT gv.goal_id, gv.distance, g.description, g.status, g.level
+         FROM goal_vectors gv
+         JOIN goals g ON g.id = gv.goal_id
+         WHERE gv.embedding MATCH ?1
+         ORDER BY gv.distance ASC
+         LIMIT ?2`
+      )
+      .all(Buffer.from(queryEmbedding.buffer), topK) as Array<{
+      goal_id: string;
+      distance: number;
+      description: string;
+      status: string;
+      level: string;
+    }>;
+
+    return rows.map((r) => ({
+      id: r.goal_id,
+      distance: r.distance,
+      description: r.description,
+      status: r.status,
+      level: r.level,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export function getGoalVector(
+  db: Database.Database,
+  goalId: string
+): Float32Array | null {
+  const row = db
+    .prepare('SELECT embedding FROM goal_vectors WHERE goal_id = ?')
+    .get(goalId) as { embedding: Buffer | Uint8Array } | undefined;
+  if (!row) return null;
+  return new Float32Array(new Uint8Array(row.embedding)).slice();
+}
+
+export function storeMemoryVector(
+  db: Database.Database,
+  memoryId: string,
+  embedding: Float32Array
+): void {
+  db.prepare(
+    'INSERT OR REPLACE INTO memory_vectors (memory_id, embedding) VALUES (?, ?)'
+  ).run(memoryId, Buffer.from(embedding.buffer));
+}
+
+export function storeGoalVector(
+  db: Database.Database,
+  goalId: string,
+  embedding: Float32Array
+): void {
+  db.prepare(
+    'INSERT OR REPLACE INTO goal_vectors (goal_id, embedding) VALUES (?, ?)'
+  ).run(goalId, Buffer.from(embedding.buffer));
+}
+
+export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
+  if (a.length !== b.length) return 0;
+
+  let dot = 0;
+  let magA = 0;
+  let magB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    magA += a[i] * a[i];
+    magB += b[i] * b[i];
+  }
+  if (magA === 0 || magB === 0) return 0;
+  return dot / (Math.sqrt(magA) * Math.sqrt(magB));
+}
