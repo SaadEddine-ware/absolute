@@ -57,7 +57,7 @@ export function workerCommand(program: Command): void {
 
   set
     .command('local')
-    .description('Configure local embeddings via transformers.js. Downloads the model on first use.')
+    .description('Configure local embeddings (transformers.js). Downloads the model on first use.\n\nNOTE: requires "@huggingface/transformers", which is NOT installed by default (it pulls a transitive onnxruntime-node with a fatal postinstall on Linux). Run "npm install @huggingface/transformers" before using local embeddings.')
     .option('-m, --model <model>', `Local model id (default: bge-base-en-v1.5). Options: ${Object.keys(LOCAL_MODELS).join(', ')}`)
     .option('-v, --verify', 'Run one embedding to confirm real model dimensions (downloads model)')
     .option('-y, --yes', 'Skip confirmation prompts')

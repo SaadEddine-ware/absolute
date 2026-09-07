@@ -1,3 +1,13 @@
+// Local embeddings via transformers.js.
+//
+// Requires `npm install @huggingface/transformers` — not installed by
+// default. Run this manually before using the local embedding provider.
+// The import is dynamic (see initExtractor) so the package is never
+// required to be installed unless LocalProvider is actually instantiated.
+// @huggingface/transformers is only a devDependency of @absolute/core
+// (for typecheck); its transitive onnxruntime-node has a known fatal
+// postinstall failure on Linux (microsoft/onnxruntime#24918, #24770), so
+// it must not be a hard dependency of the core install.
 import type { EmbeddingProvider } from './types.js';
 import os from 'node:os';
 import path from 'node:path';
