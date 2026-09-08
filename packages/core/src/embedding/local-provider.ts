@@ -6,8 +6,9 @@
 // (optional) install as non-fatal, so its transitive onnxruntime-node
 // postinstall failure on Linux (microsoft/onnxruntime#24918, #24770)
 // cannot break the core install. The import is dynamic (see initExtractor)
-// and typed via a minimal local shim, so typecheck/build never depend on
-// the actual package being installed.
+// and the module's types come from an ambient declaration
+// (huggingface-transformers.d.ts), so typecheck/build never depend on the
+// real package being installed.
 import type { EmbeddingProvider } from './types.js';
 import os from 'node:os';
 import path from 'node:path';
@@ -141,8 +142,7 @@ export class LocalProvider implements EmbeddingProvider {
     }
     let transformers: MinimalTransformersModule;
     try {
-      transformers = await import('@huggingface/transformers') as unknown as
-        MinimalTransformersModule;
+      transformers = await import('@huggingface/transformers');
     } catch {
       throw new Error(
         'Local embeddings require @huggingface/transformers. ' +
