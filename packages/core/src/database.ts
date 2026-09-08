@@ -113,9 +113,11 @@ function validateEmbeddingMetadata(
     return;
   }
 
-  if (row.model_id !== provider.modelId) {
+  if (row.model_id !== provider.modelId || row.dimensions !== provider.dimensions) {
     console.error(
-      `\nEmbedding provider changed from "${row.model_id}" to "${provider.modelId}".\n` +
+      `\nEmbedding provider mismatch: database was built with "${row.model_id}" ` +
+      `(${row.dimensions} dims) but the current provider is "${provider.modelId}" ` +
+      `(${provider.dimensions} dims).\n` +
       `Run \`absolute migrate embeddings\` before continuing.\n`
     );
     process.exit(1);

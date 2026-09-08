@@ -12,7 +12,8 @@
   },
   "scripts": {
     "build": "tsup",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test"
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0",

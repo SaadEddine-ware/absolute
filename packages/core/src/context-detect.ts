@@ -69,7 +69,7 @@ export async function detectContext(
   }
 
   const decision =
-    activeGoal && goalSimilarity > 0
+    activeGoal
       ? getDecision(goalSimilarity, settings.similarity_threshold)
       : 'continue';
 
@@ -168,6 +168,7 @@ export function searchSimilarMemories(
   topK: number
 ): MemoryHeader[] {
   try {
+    const limit = clampTopK(topK);
     const rows = db
       .prepare(
         `SELECT mv.memory_id as id, m.type, m.content, m.importance, m.tokens_est,
@@ -175,11 +176,10 @@ export function searchSimilarMemories(
                 mv.distance
          FROM memory_vectors mv
          JOIN memories m ON m.id = mv.memory_id
-         WHERE mv.embedding MATCH ?1 AND m.session_id = ?2
-         ORDER BY mv.distance ASC
-         LIMIT ?3`
+         WHERE mv.embedding MATCH ? AND k = ? AND m.session_id = ?
+         ORDER BY mv.distance ASC`
       )
-      .all(Buffer.from(queryEmbedding.buffer), sessionId, topK) as Array<
+      .all(Buffer.from(queryEmbedding.buffer), limit, sessionId) as Array<
       MemoryHeader & { memory_id: string; distance: number }
     >;
 
@@ -198,18 +198,21 @@ export function searchSimilarGoals(
   queryEmbedding: Float32Array,
   opts: { sessionId?: string; topK?: number } = {}
 ): Array<{ id: string; description: string; level: string; status: string; distance: number }> {
-  const topK = opts.topK ?? DEFAULT_TOP_K;
+  const limit = clampTopK(opts.topK ?? DEFAULT_TOP_K);
+  const sessionFilter = opts.sessionId ? ' AND g.session_id = ?' : '';
   try {
+    const params: Array<Buffer | string | number> = [Buffer.from(queryEmbedding.buffer), limit];
+    if (opts.sessionId) params.push(opts.sessionId);
+
     const rows = db
       .prepare(
         `SELECT gv.goal_id, gv.distance, g.description, g.status, g.level
          FROM goal_vectors gv
          JOIN goals g ON g.id = gv.goal_id
-         WHERE gv.embedding MATCH ?1
-         ORDER BY gv.distance ASC
-         LIMIT ?2`
+         WHERE gv.embedding MATCH ? AND k = ?${sessionFilter}
+         ORDER BY gv.distance ASC`
       )
-      .all(Buffer.from(queryEmbedding.buffer), topK) as Array<{
+      .all(...params) as Array<{
       goal_id: string;
       distance: number;
       description: string;
@@ -237,7 +240,8 @@ export function getGoalVector(
     .prepare('SELECT embedding FROM goal_vectors WHERE goal_id = ?')
     .get(goalId) as { embedding: Buffer | Uint8Array } | undefined;
   if (!row) return null;
-  return new Float32Array(new Uint8Array(row.embedding)).slice();
+  const bytes = new Uint8Array(row.embedding);
+  return new Float32Array(bytes.buffer).slice();
 }
 
 export function storeMemoryVector(
@@ -273,4 +277,9 @@ export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
   }
   if (magA === 0 || magB === 0) return 0;
   return dot / (Math.sqrt(magA) * Math.sqrt(magB));
+}
+
+function clampTopK(topK: number): number {
+  const n = Math.floor(topK);
+  return Math.min(50, Math.max(1, Number.isFinite(n) ? n : DEFAULT_TOP_K));
 }
