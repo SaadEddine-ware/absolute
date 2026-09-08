@@ -2,12 +2,12 @@
 //
 // Requires `npm install @huggingface/transformers` — not installed by
 // default. Run this manually before using the local embedding provider.
-// The import is dynamic (see initExtractor) so the package is never
-// required to be installed unless LocalProvider is actually instantiated.
-// @huggingface/transformers is only a devDependency of @absolute/core
-// (for typecheck); its transitive onnxruntime-node has a known fatal
-// postinstall failure on Linux (microsoft/onnxruntime#24918, #24770), so
-// it must not be a hard dependency of the core install.
+// It is an optionalDependency of @absolute/core: npm treats a failed
+// (optional) install as non-fatal, so its transitive onnxruntime-node
+// postinstall failure on Linux (microsoft/onnxruntime#24918, #24770)
+// cannot break the core install. The import is dynamic (see initExtractor)
+// and typed via a minimal local shim, so typecheck/build never depend on
+// the actual package being installed.
 import type { EmbeddingProvider } from './types.js';
 import os from 'node:os';
 import path from 'node:path';
@@ -130,9 +130,19 @@ export class LocalProvider implements EmbeddingProvider {
   }
 
   private async initExtractor(): Promise<FeatureExtractor> {
-    let transformers: typeof import('@huggingface/transformers');
+    interface MinimalPipeline {
+      (text: string, opts: { pooling: 'mean'; normalize: true }):
+        Promise<{ data: Float32Array | number[] }>;
+    }
+    interface MinimalTransformersModule {
+      env: { cacheDir?: string };
+      pipeline(task: string, model: string, opts?: Record<string, unknown>):
+        Promise<MinimalPipeline>;
+    }
+    let transformers: MinimalTransformersModule;
     try {
-      transformers = await import('@huggingface/transformers');
+      transformers = await import('@huggingface/transformers') as unknown as
+        MinimalTransformersModule;
     } catch {
       throw new Error(
         'Local embeddings require @huggingface/transformers. ' +
