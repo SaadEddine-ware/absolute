@@ -7,6 +7,12 @@ const DEFAULT_THRESHOLD = 0.6;
 const MIN_THRESHOLD = 0.3;
 const MAX_THRESHOLD = 0.9;
 const EMA_ALPHA = 0.2;
+// Width of the "ask" ambiguity zone above the user's learned threshold. The
+// `continue` boundary is `threshold + ASK_ZONE_WIDTH`, capped at MAX_THRESHOLD,
+// so a user whose threshold legitimately rises above 0.8 is never overridden
+// by a hardcoded upper constant (the old hardcoded `> 0.8` silently ignored the
+// adaptive system once threshold > 0.8).
+const ASK_ZONE_WIDTH = 0.2;
 
 export function getUserSettings(
   db: Database.Database,
@@ -108,7 +114,9 @@ export function getDecision(
   similarity: number,
   threshold: number
 ): 'continue' | 'ask' | 'switch' {
-  if (similarity > 0.8) return 'continue';
+  const askZoneWidth = ASK_ZONE_WIDTH;
+  const upperBound = Math.min(MAX_THRESHOLD, threshold + askZoneWidth);
+  if (similarity > upperBound) return 'continue';
   if (similarity <= threshold) return 'switch';
   return 'ask';
 }

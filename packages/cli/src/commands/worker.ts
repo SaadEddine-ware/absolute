@@ -93,7 +93,7 @@ async function runStatus(): Promise<void> {
 
   let db;
   try {
-    const opened = openDatabase({
+    const opened = await openDatabase({
       dbPath: getDbPath(),
       embeddingProvider: createAnyProvider(config),
       skipEmbeddingValidation: true,
@@ -189,7 +189,7 @@ async function runSetCloud(url: string, opts: { token?: string; yes?: boolean })
     timeoutMs: 8000,
   });
 
-  const { db } = openDatabase({
+  const { db } = await openDatabase({
     dbPath: getDbPath(),
     embeddingProvider: provider,
     skipEmbeddingValidation: true,
@@ -242,7 +242,7 @@ async function runSetLocal(opts: {
     console.log('The model downloads on first use. Add --verify to confirm real dimensions now.\n');
   }
 
-  const { db } = openDatabase({
+  const { db } = await openDatabase({
     dbPath: getDbPath(),
     embeddingProvider: provider,
     skipEmbeddingValidation: true,

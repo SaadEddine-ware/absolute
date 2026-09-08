@@ -9,7 +9,7 @@ import {
 import { loadConfig, getDbPath } from '../utils/config.js';
 import { createAnyProvider } from '../utils/embedding.js';
 
-function getDb() {
+async function getDb() {
   const config = loadConfig();
   return openDatabase({ dbPath: getDbPath(), embeddingProvider: createAnyProvider(config) });
 }
@@ -23,8 +23,8 @@ export function sessionCommand(program: Command): void {
     .command('start')
     .description('Start a new session')
     .option('-t, --title <title>', 'Session title')
-    .action((opts) => {
-      const { db } = getDb();
+    .action(async (opts) => {
+      const { db } = await getDb();
       const session = createSession(db, { title: opts.title });
       console.log(`Session started: ${session.id}`);
       if (session.title) {
@@ -37,8 +37,8 @@ export function sessionCommand(program: Command): void {
     .command('list')
     .description('List all sessions')
     .option('-n, --limit <n>', 'Max sessions to show', '20')
-    .action((opts) => {
-      const { db } = getDb();
+    .action(async (opts) => {
+      const { db } = await getDb();
       const sessions = getSessions(db, parseInt(opts.limit, 10));
       if (sessions.length === 0) {
         console.log('No sessions found.');
@@ -57,8 +57,8 @@ export function sessionCommand(program: Command): void {
   session
     .command('continue <id>')
     .description('Continue an existing session')
-    .action((id) => {
-      const { db } = getDb();
+    .action(async (id) => {
+      const { db } = await getDb();
       const session = getSession(db, id);
       if (!session) {
         console.error(`Session not found: ${id}`);
@@ -75,8 +75,8 @@ export function sessionCommand(program: Command): void {
   session
     .command('delete <id>')
     .description('Delete a session')
-    .action((id) => {
-      const { db } = getDb();
+    .action(async (id) => {
+      const { db } = await getDb();
       const deleted = deleteSession(db, id);
       if (deleted) {
         console.log(`Deleted session: ${id}`);

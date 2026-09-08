@@ -25,6 +25,7 @@ import {
   searchSimilarMemories,
   searchSimilarGoals,
   getEmbeddingMetadata,
+  getDecision,
 } from '../dist/index.js';
 
 const DIM = 768;
@@ -70,7 +71,7 @@ function controlledProvider(nextVec) {
 async function setupSessionWithVector(vec, memoryContent = 'stored memory about space travel') {
   const { dir, dbPath } = tempDbPath();
   const provider = { modelId: 'fake:test', dimensions: DIM, async embed() { throw new Error('unused'); } };
-  const { db } = openDatabase({ dbPath, embeddingProvider: provider });
+  const { db } = await openDatabase({ dbPath, embeddingProvider: provider });
 
   const session = createSession(db, { title: 'phase3' });
   const memory = createMemory(db, {
@@ -145,7 +146,7 @@ test('(1b) sqlite-vec KNN returns the closest memory for a similar prompt', asyn
 test('(1c) searchSimilarGoals filters by session_id (PLAN.md:436 spec)', async () => {
   const provider = { modelId: 'fake:test', dimensions: DIM, async embed() { throw new Error('unused'); } };
   const { dir, dbPath } = tempDbPath();
-  const { db } = openDatabase({ dbPath, embeddingProvider: provider });
+  const { db } = await openDatabase({ dbPath, embeddingProvider: provider });
   try {
     const s1 = createSession(db, { title: 's1' });
     const s2 = createSession(db, { title: 's2' });
@@ -189,11 +190,11 @@ test('(2) timeout fallback when the worker is unreachable (PLAN verify bullet 2)
   }
 });
 
-test('(3) startup guard rejects a mismatched embedding provider (PLAN verify bullet 3)', () => {
+test('(3) startup guard rejects a mismatched embedding provider (PLAN verify bullet 3)', async () => {
   const { dir, dbPath } = tempDbPath();
   try {
     const first = { modelId: 'fake:a', dimensions: DIM, async embed() { throw new Error('unused'); } };
-    const firstDb = openDatabase({ dbPath, embeddingProvider: first });
+    const firstDb = await openDatabase({ dbPath, embeddingProvider: first });
     assert.equal(getEmbeddingMetadata(firstDb.db).model_id, 'fake:a');
     firstDb.db.close();
 
@@ -208,7 +209,7 @@ test('(3) startup guard rejects a mismatched embedding provider (PLAN verify bul
       try {
         // Different model id -> guard fires.
         const differentModel = { modelId: 'fake:b', dimensions: DIM, async embed() { throw new Error('unused'); } };
-        const h1 = openDatabase({ dbPath, embeddingProvider: differentModel });
+        const h1 = await openDatabase({ dbPath, embeddingProvider: differentModel });
         assert.equal(exitCode, 1);
         assert.match(errors.join('\n'), /provider mismatch/i);
         h1.db.close();
@@ -217,7 +218,7 @@ test('(3) startup guard rejects a mismatched embedding provider (PLAN verify bul
         exitCode = null;
         errors.length = 0;
         const differentDims = { modelId: 'fake:a', dimensions: 512, async embed() { throw new Error('unused'); } };
-        const h2 = openDatabase({ dbPath, embeddingProvider: differentDims });
+        const h2 = await openDatabase({ dbPath, embeddingProvider: differentDims });
         assert.equal(exitCode, 1);
         assert.match(errors.join('\n'), /512 dims/);
         h2.db.close();
@@ -225,7 +226,7 @@ test('(3) startup guard rejects a mismatched embedding provider (PLAN verify bul
         // Matching provider -> opens fine, guard does not fire.
         exitCode = null;
         const match = { modelId: 'fake:a', dimensions: DIM, async embed() { throw new Error('unused'); } };
-        const h3 = openDatabase({ dbPath, embeddingProvider: match });
+        const h3 = await openDatabase({ dbPath, embeddingProvider: match });
         assert.equal(exitCode, null);
         h3.db.close();
       } finally {
@@ -234,5 +235,45 @@ test('(3) startup guard rejects a mismatched embedding provider (PLAN verify bul
       }
   } finally {
     cleanup({ dir, dbPath });
+  }
+});
+
+test('(4) getDecision honors learned thresholds above 0.8 (BUG 1)', () => {
+  // A learned threshold > 0.8 must NOT be short-circuited by a hardcoded 0.8.
+  // 0.82 <= 0.85 -> switch (the old hardcoded `> 0.8` wrongly returned 'continue').
+  assert.equal(getDecision(0.82, 0.85), 'switch');
+  assert.equal(getDecision(0.88, 0.85), 'ask'); // inside (threshold, threshold+0.2]
+  assert.equal(getDecision(0.92, 0.85), 'continue'); // above min(0.9, 1.05)
+
+  // Default threshold 0.6 is unchanged: the continue bound stays exactly 0.8.
+  assert.equal(getDecision(0.81, 0.6), 'continue');
+  assert.equal(getDecision(0.79, 0.6), 'ask');
+  assert.equal(getDecision(0.6, 0.6), 'switch');
+});
+
+test('(5) vector index uses cosine distance, not L2 (BUG 2)', async () => {
+  const { dir, dbPath } = tempDbPath();
+  const provider = { modelId: 'fake:test', dimensions: DIM, async embed() { throw new Error('unused'); } };
+  const { db } = await openDatabase({ dbPath, embeddingProvider: provider });
+  try {
+    const session = createSession(db, { title: 'bug2' });
+
+    const a = createMemory(db, { type: 'subject', content: 'a', session_id: session.id });
+    const b = createMemory(db, { type: 'subject', content: 'b', session_id: session.id });
+
+    // Same direction as the query but magnitude 10 -> L2 distance 9, cosine distance 0.
+    const vecA = new Float32Array(DIM); vecA[0] = 10;
+    // Off-direction: [1,2,0,...] -> L2 distance ~2 (winning under L2), cosine 0.447.
+    const vecB = new Float32Array(DIM); vecB[0] = 1; vecB[1] = 2;
+
+    storeMemoryVector(db, a.id, vecA);
+    storeMemoryVector(db, b.id, vecB);
+
+    const q = axisVec(0); // unit [1,0,0,...]
+    const results = searchSimilarMemories(db, q, session.id, 2);
+    assert.equal(results[0].id, a.id,
+      'same-direction vector must rank first under cosine distance (would be second under L2)');
+  } finally {
+    cleanupDb({ db, dir });
   }
 });

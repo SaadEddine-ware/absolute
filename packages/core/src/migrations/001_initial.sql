@@ -62,7 +62,10 @@ CREATE TABLE IF NOT EXISTS sessions (
 -- memory_vectors: KNN vector index for memory similarity search.
 -- Queried via: SELECT memory_id, distance FROM memory_vectors
 --   WHERE embedding MATCH ?1 ORDER BY distance LIMIT ?2
--- The vec0 extension handles cosine distance natively.
+-- NOTE: vec0's default distance metric is L2, NOT cosine. Cosine must be
+-- requested explicitly via `distance_metric=cosine` on the column. Migration
+-- 006 migrates these tables to cosine; this original definition stays as-is
+-- for historical/fresh-DB-reference clarity.
 CREATE VIRTUAL TABLE IF NOT EXISTS memory_vectors USING vec0(
     memory_id TEXT PRIMARY KEY,
     embedding FLOAT[768]

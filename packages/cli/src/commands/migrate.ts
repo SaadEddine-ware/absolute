@@ -22,7 +22,7 @@ export function migrateCommand(program: Command): void {
         modelId: config.memory?.embeddingModelId,
       });
 
-      const { db } = openDatabase({ dbPath: getDbPath(), embeddingProvider: provider, skipEmbeddingValidation: true });
+      const { db } = await openDatabase({ dbPath: getDbPath(), embeddingProvider: provider, skipEmbeddingValidation: true });
 
       const memories = db.prepare('SELECT COUNT(*) as count FROM memories').get() as { count: number };
       const goals = db.prepare('SELECT COUNT(*) as count FROM goals').get() as { count: number };
