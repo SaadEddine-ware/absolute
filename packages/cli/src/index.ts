@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import { runTui } from '@absolute/tui';
 import { sessionCommand } from './commands/session.js';
 import { configCommand } from './commands/config.js';
 import { migrateCommand } from './commands/migrate.js';
@@ -16,5 +17,10 @@ sessionCommand(program);
 configCommand(program);
 migrateCommand(program);
 workerCommand(program);
+
+// `absolute` with no subcommand launches the TUI chat interface (Phase 4).
+program.action(() => {
+  runTui();
+});
 
 program.parse();
