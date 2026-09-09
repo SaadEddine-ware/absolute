@@ -1,11 +1,13 @@
 import { Box, Text, useApp } from 'ink';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useSession } from './hooks/useSession.js';
 import { useChat } from './hooks/useChat.js';
 import { useMemory } from './hooks/useMemory.js';
 import { ChatScreen } from './screens/chat.js';
 import type { ChatContext } from './types.js';
 import { theme } from './styles/theme.js';
+import { loadConfig } from './lib/config.js';
+import { createAnyProvider } from './lib/embedding.js';
 
 const HELP = [
   '/help    show this help',
@@ -17,7 +19,16 @@ const HELP = [
 export function App(): JSX.Element {
   const { exit } = useApp();
   const { status, db, session, sessions, error, startNew } = useSession();
-  const { summary, refresh } = useMemory(db, session?.id ?? null);
+
+  // Build the embedding provider once (config is stable for a session).
+  const embeddingProvider = useMemo(() => createAnyProvider(loadConfig()), []);
+
+  const hasSession = db !== null && session !== null;
+  const { summary, refresh, store } = useMemory(
+    db,
+    session?.id ?? null,
+    hasSession ? embeddingProvider : null
+  );
 
   const getContext = useCallback(
     (): ChatContext => ({
@@ -28,7 +39,11 @@ export function App(): JSX.Element {
     [session, summary]
   );
 
-  const { messages, send, pushSystem, clear, isThinking, mode } = useChat(getContext);
+  const { messages, send, pushSystem, clear, isThinking, mode } = useChat(getContext, {
+    db,
+    provider: hasSession ? embeddingProvider : null,
+    onExchange: store,
+  });
 
   const handleCommand = useCallback(
     (command: string) => {

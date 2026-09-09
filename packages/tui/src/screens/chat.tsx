@@ -23,6 +23,7 @@ export function ChatScreen({
   messages,
   isThinking,
   memoryCount,
+  memoryTokens,
   sessionCount,
   onSubmit,
   onCommand,
@@ -62,6 +63,7 @@ export function ChatScreen({
         mode={mode}
         sessionLabel={sessionLabel}
         memoryCount={memoryCount}
+        memoryTokens={memoryTokens}
         sessionCount={sessionCount}
       />
     </Box>

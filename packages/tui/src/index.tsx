@@ -27,9 +27,25 @@ export type {
   ChatContext,
   MessageRole,
   MessageResponder,
+  MessageResponderHandlers,
 } from './types.js';
 export type { UseChatResult } from './hooks/useChat.js';
 export type { UseSessionResult } from './hooks/useSession.js';
 export type { UseMemoryResult } from './hooks/useMemory.js';
+export type { MemorySummary } from './hooks/useMemory.js';
 export type { InputProps } from './components/input.js';
 export type { StatusBarProps } from './components/status-bar.js';
+export type { MemoryBadgeProps } from './components/memory-badge.js';
+export {
+  detectSessionContext,
+  storeExchangeMemory,
+  buildNextMessages,
+  scoreImportance,
+  extractExchangeKeywords,
+  SYNC_DETECT_TIMEOUT_MS,
+  ASYNC_EMBED_TIMEOUT_MS,
+  RECALL_TOP_K,
+  type Exchange,
+  type SyncResult,
+  type BuildNextMessagesInput,
+} from './lib/memory-pipeline.js';

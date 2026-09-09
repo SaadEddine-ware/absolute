@@ -1,3 +1,5 @@
+import type { LLMMessage } from '@absolute/providers';
+
 export type MessageRole = 'user' | 'assistant' | 'system';
 
 export interface ChatMessage {
@@ -25,7 +27,7 @@ export interface MessageResponderHandlers {
 
 export interface MessageResponder {
   respond(
-    prompt: string,
+    messages: LLMMessage[],
     ctx: ChatContext,
     handlers: MessageResponderHandlers
   ): Promise<void>;

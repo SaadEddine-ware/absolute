@@ -63,6 +63,7 @@ export {
   createMemoryThread,
   linkAcrossSessions,
   getMemoryContext,
+  extractKeywords,
 } from './cross-session.js';
 
 export {
@@ -105,6 +106,7 @@ export {
   getVec0Dimension,
   getEmbeddingMetadata,
   searchSimilarMemories,
+  searchSimilarMemoriesGlobal,
   searchSimilarGoals,
   getGoalVector,
   storeMemoryVector,

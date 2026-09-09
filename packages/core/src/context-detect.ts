@@ -14,6 +14,8 @@ export interface ContextDetectResult {
   similarity: number;
   threshold: number;
   relevantMemories: MemoryHeader[];
+  /** Similar memories from OTHER sessions (cross-session recall). Empty unless crossSessionTopK > 0. */
+  crossSessionMemories: MemoryHeader[];
   fallback: boolean;
   reason?: string;
 }
@@ -23,6 +25,8 @@ export interface DetectOptions {
   sessionId: string;
   userId?: string;
   topK?: number;
+  /** When > 0, also KNN-search memories from other sessions (for cross-session recall). */
+  crossSessionTopK?: number;
 }
 
 export async function detectContext(
@@ -36,6 +40,7 @@ export async function detectContext(
     similarity: 0,
     threshold: getUserSettings(db, opts.userId).similarity_threshold,
     relevantMemories: [],
+    crossSessionMemories: [],
     fallback: true,
   };
 
@@ -80,11 +85,20 @@ export async function detectContext(
     opts.topK ?? DEFAULT_TOP_K
   );
 
+  const crossSessionMemories =
+    opts.crossSessionTopK && opts.crossSessionTopK > 0
+      ? searchSimilarMemoriesGlobal(db, queryEmbedding, {
+          topK: opts.crossSessionTopK,
+          excludeSessionId: opts.sessionId,
+        })
+      : [];
+
   return {
     decision,
     similarity: goalSimilarity,
     threshold: settings.similarity_threshold,
     relevantMemories,
+    crossSessionMemories,
     fallback: false,
   };
 }
@@ -182,6 +196,43 @@ export function searchSimilarMemories(
       .all(Buffer.from(queryEmbedding.buffer), limit, sessionId) as Array<
       MemoryHeader & { memory_id: string; distance: number }
     >;
+
+    return rows.map(({ memory_id: _id, distance: _d, ...rest }) => rest) as MemoryHeader[];
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes('dimension') || msg.includes('different')) {
+      return [];
+    }
+    throw e;
+  }
+}
+
+// KNN across ALL sessions (optionally excluding one). Used for cross-session
+// recall so a brand-new session can still surface memories the user discussed
+// before — the Phase 6 verify ("new session remembers previous context").
+export function searchSimilarMemoriesGlobal(
+  db: Database.Database,
+  queryEmbedding: Float32Array,
+  opts: { topK?: number; excludeSessionId?: string } = {}
+): MemoryHeader[] {
+  try {
+    const limit = clampTopK(opts.topK ?? DEFAULT_TOP_K);
+    const exclude = opts.excludeSessionId;
+    const rows = db
+      .prepare(
+        `SELECT mv.memory_id as id, m.type, m.content, m.importance, m.tokens_est,
+                (SELECT COUNT(*) FROM memories c WHERE c.parent_id = mv.memory_id) as child_count,
+                mv.distance
+         FROM memory_vectors mv
+         JOIN memories m ON m.id = mv.memory_id
+         WHERE mv.embedding MATCH ? AND k = ?${exclude ? ' AND m.session_id != ?' : ''}
+         ORDER BY mv.distance ASC`
+      )
+      .all(
+        Buffer.from(queryEmbedding.buffer),
+        limit,
+        ...(exclude ? [exclude] : [])
+      ) as Array<MemoryHeader & { memory_id: string; distance: number }>;
 
     return rows.map(({ memory_id: _id, distance: _d, ...rest }) => rest) as MemoryHeader[];
   } catch (e) {

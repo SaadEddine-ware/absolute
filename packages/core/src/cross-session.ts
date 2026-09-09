@@ -159,7 +159,9 @@ export function getMemoryContext(
   return { memory, children, depth };
 }
 
-function extractKeywords(text: string): string[] {
+// Local keyword extraction (regex + stopword filter, no LLM call). Shared by
+// cross-session linking and the Phase 6 ASYNC memory-store path.
+export function extractKeywords(text: string): string[] {
   const stopWords = new Set([
     'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
     'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',

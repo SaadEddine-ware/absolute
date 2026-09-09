@@ -10,6 +10,10 @@ export interface SystemPromptInput {
   recentAction?: string;
   providerLabel?: string;
   modelLabel?: string;
+  /** Similar memories surfaced by sqlite-vec KNN (included verbatim). */
+  relevantMemories?: MemoryHeader[];
+  /** Optional note appended near the end (e.g. a timeout-fallback notice). */
+  contextNote?: string;
 }
 
 export function buildSystemPrompt(input: SystemPromptInput): string {
@@ -34,6 +38,12 @@ export function buildSystemPrompt(input: SystemPromptInput): string {
   parts.push(renderMemoryHeaders(context.headers));
   parts.push('');
 
+  if (input.relevantMemories && input.relevantMemories.length > 0) {
+    parts.push('=== RELEVANT MEMORIES (recalled by similarity) ===');
+    parts.push(renderMemoryHeaders(input.relevantMemories));
+    parts.push('');
+  }
+
   parts.push('=== RECENT CONTEXT ===');
   if (input.recentPrompt) {
     parts.push(`- Last prompt: "${input.recentPrompt}"`);
@@ -52,6 +62,11 @@ export function buildSystemPrompt(input: SystemPromptInput): string {
       'note them naturally. The memory system handles persistence automatically.'
   );
   parts.push('');
+
+  if (input.contextNote) {
+    parts.push(`Note: ${input.contextNote}`);
+    parts.push('');
+  }
 
   return parts.join('\n');
 }

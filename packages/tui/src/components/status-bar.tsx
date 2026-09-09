@@ -1,10 +1,12 @@
 import { Box, Text } from 'ink';
 import { theme } from '../styles/theme.js';
+import { MemoryBadge } from './memory-badge.js';
 
 export interface StatusBarProps {
   mode: string;
   sessionLabel: string;
   memoryCount: number;
+  memoryTokens: number;
   sessionCount: number;
 }
 
@@ -12,6 +14,7 @@ export function StatusBar({
   mode,
   sessionLabel,
   memoryCount,
+  memoryTokens,
   sessionCount,
 }: StatusBarProps): JSX.Element {
   return (
@@ -28,7 +31,7 @@ export function StatusBar({
       <Text color={theme.muted}>
         <Text color={theme.statusOk}>{mode}</Text>
         {'  '}
-        <Text color={theme.muted}>mem {memoryCount}</Text>
+        <MemoryBadge count={memoryCount} tokensEst={memoryTokens} />
         {'  '}
         <Text color={theme.muted}>sess {sessionCount}</Text>
         {'  '}

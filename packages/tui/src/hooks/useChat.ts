@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProviderManager } from '@absolute/providers';
+import type { LLMMessage } from '@absolute/providers';
+import type { AbsoluteDatabase, EmbeddingProvider } from '@absolute/core';
 import type { ChatMessage, ChatContext, MessageResponder } from '../types.js';
 import type { AbsoluteConfig } from '../lib/config.js';
 import { loadConfig } from '../lib/config.js';
+import {
+  buildNextMessages,
+  detectSessionContext,
+  MAX_HISTORY_TURNS,
+  type Exchange,
+} from '../lib/memory-pipeline.js';
 
 let counter = 0;
 export function nextMessageId(): string {
@@ -14,7 +22,9 @@ export const STUB_DELAY_MS = 120;
 
 export function createStubResponder(): MessageResponder {
   return {
-    async respond(prompt, ctx, handlers) {
+    async respond(messages, ctx, handlers) {
+      const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+      const prompt = lastUser?.content ?? '';
       const reply = [
         `[stub] received ${prompt.length} chars in session ${ctx.sessionId.slice(0, 8)}.`,
         'No LLM provider is configured. Run `absolute provider set <id> <key>`.',
@@ -46,22 +56,21 @@ export async function createConfiguredResponder(): Promise<MessageResponder> {
 }
 
 // Wraps a configured LLMProvider's stream() in the TUI MessageResponder seam.
-// Threads the model config and streams each text delta to the handler.
+// The full message list (system prompt + history + user) is passed through.
 function createProviderResponder(
   provider: ReturnType<ProviderManager['resolve']>
 ): MessageResponder {
   if (!provider) return createStubResponder();
   return {
-    async respond(prompt, ctx, handlers) {
+    async respond(messages, ctx, handlers) {
       try {
         await provider.stream(
-          [{ role: 'user', content: prompt }],
+          messages,
           {
             onText: (delta) => handlers.onDelta(delta),
             onAborted: () => handlers.onAborted?.(),
             onError: (err) => handlers.onError?.(err),
           },
-          // The caller may pass an AbortSignal to cancel a running stream.
           { signal: ctx.signal }
         );
       } catch (e) {
@@ -102,19 +111,51 @@ export async function resolveResponder(): Promise<ResolvedResponder> {
   };
 }
 
-export function useChat(getContext: () => ChatContext): UseChatResult {
+// Map recent on-screen messages to LLM user/assistant turns for continuity.
+function historyFromMessages(
+  msgs: ChatMessage[]
+): Array<{ role: 'user' | 'assistant'; content: string }> {
+  return msgs
+    .filter((m) => m.role === 'user' || m.role === 'assistant')
+    .filter((m) => m.text.trim().length > 0)
+    .slice(-MAX_HISTORY_TURNS)
+    .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.text }));
+}
+
+export interface UseChatOptions {
+  /** async-opened core database; enables SYNC detection + ASYNC storage. */
+  db?: AbsoluteDatabase | null;
+  /** configured embedding provider (createAnyProvider(config)). */
+  provider?: EmbeddingProvider | null;
+  /** fire-and-forget sink for storing an exchange as a memory (useMemory.store). */
+  onExchange?: (exchange: Exchange) => void;
+}
+
+export function useChat(
+  getContext: () => ChatContext,
+  options: UseChatOptions = {}
+): UseChatResult {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [responder, setResponder] = useState<MessageResponder>(createStubResponder);
   const [mode, setMode] = useState('stub');
   const abortRef = useRef<AbortController | null>(null);
+  const messagesRef = useRef<ChatMessage[]>([]);
+  const realResponderRef = useRef(false);
+  const configRef = useRef<AbsoluteConfig>({});
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     let cancelled = false;
+    configRef.current = loadConfig();
     void resolveResponder().then((resolved) => {
       if (cancelled) return;
       setResponder(() => resolved.responder);
       setMode(resolved.label);
+      realResponderRef.current = resolved.label !== 'stub';
     });
     return () => {
       cancelled = true;
@@ -161,8 +202,32 @@ export function useChat(getContext: () => ChatContext): UseChatResult {
       };
 
       const ctx: ChatContext = { ...getContext(), signal: controller.signal };
+      const sessionId = ctx.sessionId;
+
+      // [SYNC] detect context before the LLM call and build the message list
+      // (system prompt with recalled memories + recent history + user prompt).
+      let llmMessages: LLMMessage[] = [{ role: 'user', content: trimmed }];
+      if (options.db && options.provider && sessionId && sessionId !== 'none') {
+        const config = configRef.current;
+        const sync = await detectSessionContext(
+          options.db,
+          options.provider,
+          trimmed,
+          sessionId
+        );
+        llmMessages = buildNextMessages({
+          prompt: trimmed,
+          sessionContext: sync.sessionContext,
+          relevantMemories: sync.relevantMemories,
+          history: historyFromMessages(messagesRef.current),
+          providerLabel: mode === 'stub' ? undefined : mode,
+          modelLabel: config.model,
+          contextNote: sync.note,
+        });
+      }
+
       try {
-        await responder.respond(trimmed, ctx, {
+        await responder.respond(llmMessages, ctx, {
           onDelta: (d) => {
             // EOF marker: empty delta signals the stream finished.
             if (d === '') return;
@@ -180,9 +245,21 @@ export function useChat(getContext: () => ChatContext): UseChatResult {
         });
       } finally {
         setIsThinking(false);
+        // [ASYNC] fire-and-forget storage only for real — not stub — responses
+        // that completed without an error marker.
+        if (
+          realResponderRef.current &&
+          !errorMarker &&
+          options.onExchange &&
+          options.db &&
+          sessionId &&
+          sessionId !== 'none'
+        ) {
+          void options.onExchange({ prompt: trimmed, response: assistantText });
+        }
       }
     },
-    [responder, getContext]
+    [responder, getContext, options.db, options.provider, options.onExchange, mode]
   );
 
   const clear = useCallback(() => setMessages([]), []);

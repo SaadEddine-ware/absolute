@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import { loadSessionContext } from '@absolute/core';
 import type { AbsoluteDatabase } from '@absolute/core';
+import type { EmbeddingProvider } from '@absolute/core';
+import { storeExchangeMemory, type Exchange } from '../lib/memory-pipeline.js';
 
 export interface MemorySummary {
   count: number;
@@ -9,13 +11,16 @@ export interface MemorySummary {
 
 export interface UseMemoryResult {
   summary: MemorySummary;
+  /** ASYNC fire-and-forget store of an exchange into memories + memory_vectors. */
+  store: (exchange: Exchange) => Promise<void>;
   refresh: () => void;
 }
 
-// Phase 4 scope: surface the memory context that exists for a session (count +
-// estimated tokens via the core progressive-load machinery). The SYNC detection
-// and ASYNC storage wiring that make chat actually write memories is Phase 6.
-export function useMemory(db: AbsoluteDatabase | null, sessionId: string | null): UseMemoryResult {
+export function useMemory(
+  db: AbsoluteDatabase | null,
+  sessionId: string | null,
+  embeddingProvider: EmbeddingProvider | null
+): UseMemoryResult {
   const [version, setVersion] = useState(0);
 
   const summary = useMemo<MemorySummary>(() => {
@@ -28,7 +33,18 @@ export function useMemory(db: AbsoluteDatabase | null, sessionId: string | null)
     }
   }, [db, sessionId, version]);
 
+  // ASYNC write-back: called by useChat after a real LLM response completes.
+  // Fire-and-forget — storage failures are swallowed by storeExchangeMemory.
+  const store = useCallback(
+    async (exchange: Exchange): Promise<void> => {
+      if (!db || !sessionId || !embeddingProvider) return;
+      await storeExchangeMemory(db, embeddingProvider, sessionId, exchange);
+      setVersion((v) => v + 1);
+    },
+    [db, sessionId, embeddingProvider]
+  );
+
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
 
-  return { summary, refresh };
+  return { summary, store, refresh };
 }
