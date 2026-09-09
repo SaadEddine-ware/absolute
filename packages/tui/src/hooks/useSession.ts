@@ -57,6 +57,7 @@ export function useSession(): UseSessionResult {
     })();
     return () => {
       cancelled = true;
+      dbRef.current?.db.close();
     };
   }, []);
 

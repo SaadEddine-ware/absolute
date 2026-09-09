@@ -52,7 +52,7 @@ export function ChatScreen({
             {'  No messages yet. Say hello to start the session.'}
           </Text>
         ) : (
-          visible.map((msg, idx) => <Message key={idx} message={msg} />)
+          visible.map((msg) => <Message key={msg.id} message={msg} />)
         )}
       </Box>
 
