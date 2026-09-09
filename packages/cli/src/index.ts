@@ -5,6 +5,7 @@ import { sessionCommand } from './commands/session.js';
 import { configCommand } from './commands/config.js';
 import { migrateCommand } from './commands/migrate.js';
 import { workerCommand } from './commands/worker.js';
+import { providerCommand } from './commands/provider.js';
 
 const program = new Command();
 
@@ -17,6 +18,7 @@ sessionCommand(program);
 configCommand(program);
 migrateCommand(program);
 workerCommand(program);
+providerCommand(program);
 
 // `absolute` with no subcommand launches the TUI chat interface (Phase 4).
 program.action(() => {

@@ -1,13 +1,11 @@
 import { Box, Text, useApp } from 'ink';
 import { useCallback } from 'react';
 import { useSession } from './hooks/useSession.js';
-import { useChat, createStubResponder } from './hooks/useChat.js';
+import { useChat } from './hooks/useChat.js';
 import { useMemory } from './hooks/useMemory.js';
 import { ChatScreen } from './screens/chat.js';
 import type { ChatContext } from './types.js';
 import { theme } from './styles/theme.js';
-
-const RESPONDER = createStubResponder();
 
 const HELP = [
   '/help    show this help',
@@ -30,7 +28,7 @@ export function App(): JSX.Element {
     [session, summary]
   );
 
-  const { messages, send, pushSystem, clear, isThinking } = useChat(RESPONDER, getContext);
+  const { messages, send, pushSystem, clear, isThinking, mode } = useChat(getContext);
 
   const handleCommand = useCallback(
     (command: string) => {
@@ -83,7 +81,7 @@ export function App(): JSX.Element {
   return (
     <ChatScreen
       sessionLabel={session?.title ?? 'untitled'}
-      mode="stub"
+      mode={mode}
       messages={messages}
       isThinking={isThinking}
       memoryCount={summary.count}
