@@ -76,7 +76,7 @@ export class ProviderManager {
 
 export type { LLMProvider, LLMMessage, LLMRequest, LLMChunk, ProviderDesc, ProviderTestResult } from './types.js';
 export { OpenAIProvider } from './openai.js';
-export { AnthropicProvider } from './anthropic.js';
+export { AnthropicProvider, partitionAnthropicMessages } from './anthropic.js';
 export { GroqProvider } from './groq.js';
 export { MimoProvider, MIMO_REGIONS } from './mimo.js';
 export type { MimoOptions, MimoRegion } from './mimo.js';
