@@ -6,6 +6,10 @@ import { configCommand } from './commands/config.js';
 import { migrateCommand } from './commands/migrate.js';
 import { workerCommand } from './commands/worker.js';
 import { providerCommand } from './commands/provider.js';
+import { memoryCommand } from './commands/memory.js';
+import { doctorCommand } from './commands/doctor.js';
+import { exportCommand } from './commands/export.js';
+import { importCommand } from './commands/import.js';
 
 const program = new Command();
 
@@ -19,6 +23,10 @@ configCommand(program);
 migrateCommand(program);
 workerCommand(program);
 providerCommand(program);
+memoryCommand(program);
+doctorCommand(program);
+exportCommand(program);
+importCommand(program);
 
 // `absolute` with no subcommand launches the TUI chat interface (Phase 4).
 program.action(() => {

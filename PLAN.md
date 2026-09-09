@@ -512,7 +512,7 @@ Shipped:
 
 **Verify**: Start a session, discuss a topic, end session, start new session — AI remembers previous context. — PASSED (headless smoke test: exchange stored ASYNC w/ keywords + importance, new session SYNC recall surfaced cross-session memory, injected into system prompt; core 11/11; all typechecks + builds green). Live chat verify deferred to real terminal with API key.
 
-### Phase 7: Polish + Advanced Features — NOT STARTED
+### Phase 7: Polish + Advanced Features — COMPLETE
 **Goal**: Session browser, memory viewer, settings UI, export/import, provider polish
 
 **Files to create/update**:

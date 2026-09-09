@@ -32,3 +32,5 @@ export interface MessageResponder {
     handlers: MessageResponderHandlers
   ): Promise<void>;
 }
+
+export type Screen = 'chat' | 'sessions' | 'memories' | 'settings';

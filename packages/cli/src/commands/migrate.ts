@@ -2,10 +2,9 @@ import { Command } from 'commander';
 import {
   openDatabase,
   migrateEmbeddings,
-  CloudflareProvider,
 } from '@absolute/core';
 import { loadConfig, getDbPath } from '../utils/config.js';
-import { getCredential } from '../utils/auth.js';
+import { createAnyProvider } from '../utils/embedding.js';
 
 export function migrateCommand(program: Command): void {
   program
@@ -13,14 +12,7 @@ export function migrateCommand(program: Command): void {
     .description('Re-embed all memories and goals with the current embedding provider')
     .action(async () => {
       const config = loadConfig();
-      const workerUrl = config.memory?.embeddingWorkerUrl ?? 'http://localhost:8787';
-      const apiToken = (await getCredential('cloudflare')) ?? undefined;
-
-      const provider = new CloudflareProvider({
-        workerUrl,
-        apiToken,
-        modelId: config.memory?.embeddingModelId,
-      });
+      const provider = createAnyProvider(config);
 
       const { db } = await openDatabase({ dbPath: getDbPath(), embeddingProvider: provider, skipEmbeddingValidation: true });
 

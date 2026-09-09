@@ -1,4 +1,4 @@
-import { readFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, mkdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -40,4 +40,13 @@ export function getDataDir(): string {
 
 export function getDbPath(): string {
   return join(getDataDir(), 'absolute.db');
+}
+
+export function getConfigPath(): string {
+  return CONFIG_FILE;
+}
+
+export function saveConfig(config: AbsoluteConfig): void {
+  mkdirSync(CONFIG_DIR, { recursive: true });
+  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf-8');
 }

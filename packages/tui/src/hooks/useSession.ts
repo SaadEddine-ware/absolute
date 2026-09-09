@@ -3,6 +3,7 @@ import {
   openDatabase,
   createSession,
   getSessions,
+  deleteSession,
   type AbsoluteDatabase,
   type Session,
 } from '@absolute/core';
@@ -19,6 +20,8 @@ export interface UseSessionResult {
   error?: string;
   startNew: () => Promise<Session | null>;
   switchSession: (id: string) => Promise<void>;
+  refreshSessions: () => void;
+  removeSession: (id: string) => Promise<boolean>;
 }
 
 export function useSession(): UseSessionResult {
@@ -75,5 +78,30 @@ export function useSession(): UseSessionResult {
     if (target) setSession(target);
   }, []);
 
-  return { status, db, session, sessions, error, startNew, switchSession };
+  const refreshSessions = useCallback(() => {
+    if (!dbRef.current) return;
+    setSessions(getSessions(dbRef.current.db, 100));
+  }, []);
+
+  const removeSession = useCallback(
+    async (id: string): Promise<boolean> => {
+      if (!dbRef.current) return false;
+      const removed = deleteSession(dbRef.current.db, id);
+      if (removed) refreshSessions();
+      return removed;
+    },
+    [refreshSessions]
+  );
+
+  return {
+    status,
+    db,
+    session,
+    sessions,
+    error,
+    startNew,
+    switchSession,
+    refreshSessions,
+    removeSession,
+  };
 }
