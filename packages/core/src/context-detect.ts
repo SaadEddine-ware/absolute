@@ -17,6 +17,8 @@ export interface ContextDetectResult {
   /** Similar memories from OTHER sessions (cross-session recall). Empty unless crossSessionTopK > 0. */
   crossSessionMemories: MemoryHeader[];
   fallback: boolean;
+  /** True when an active goal with a matching-dimension vector existed, so `decision` is meaningful. */
+  goalEvaluated: boolean;
   reason?: string;
 }
 
@@ -42,6 +44,7 @@ export async function detectContext(
     relevantMemories: [],
     crossSessionMemories: [],
     fallback: true,
+    goalEvaluated: false,
   };
 
   const queryEmbedding = await embedWithTimeout(
@@ -66,15 +69,17 @@ export async function detectContext(
   const settings = getUserSettings(db, opts.userId);
 
   let goalSimilarity = 0;
+  let goalEvaluated = false;
   if (activeGoal) {
     const goalVec = getGoalVector(db, activeGoal.id);
     if (goalVec && goalVec.length === queryEmbedding.length) {
+      goalEvaluated = true;
       goalSimilarity = cosineSimilarity(queryEmbedding, goalVec);
     }
   }
 
   const decision =
-    activeGoal
+    activeGoal && goalEvaluated
       ? getDecision(goalSimilarity, settings.similarity_threshold)
       : 'continue';
 
@@ -100,6 +105,7 @@ export async function detectContext(
     relevantMemories,
     crossSessionMemories,
     fallback: false,
+    goalEvaluated,
   };
 }
 

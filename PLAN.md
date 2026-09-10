@@ -526,7 +526,7 @@ Shipped:
 
 **Verify**: Full CLI with all commands, TUI with session/memory browsing, embedding provider switching with migration.
 
-### Phase 8: Goal Tracking + Hybrid Confirmation UI — NOT STARTED
+### Phase 8: Goal Tracking + Hybrid Confirmation UI — COMPLETE
 **Goal**: Wire up the goal-tracking and hybrid-confirmation mechanism that context-detect.ts and adaptive-threshold.ts already compute but Phase 6 does not surface. This was the original defining idea of the project (see ARCHITECTURE.md's "Key Innovation: Goal-Tracked Context Switching") — Phase 6 shipped similarity-based memory recall only; this phase closes the gap deliberately, not by accident.
 
 **Background**: `detectContext()` already returns a `decision` field ('continue' | 'ask' | 'switch'), but memory-pipeline.ts's `detectSessionContext()` currently discards it. No code path creates a `goal` row from live chat, so `renderGoalHeaders()` in the system prompt is always empty in practice, and the adaptive threshold's confirm/reject counters never get real data (they only update from a user's actual answer to an "are we still on X?" prompt, which doesn't exist yet).
@@ -538,9 +538,19 @@ Shipped:
 - `packages/core/src/adaptive-threshold.ts` — wire the user's y/n answer to `switch_confirmed_count`/`switch_rejected_count` (the EMA update logic already exists from Phase 3; it just has never received real input).
 
 **Design questions to resolve before implementation** (answer these in PLAN.md, not just in code comments):
-1. What exactly triggers first-goal creation — the first message of a session, or an explicit signal in the prompt? Needs a concrete rule.
-2. During an active LLM stream, can a confirmation prompt interrupt, or does it only ever appear before the next send() begins?
-3. If the user ignores/dismisses the confirmation, what's the default (treat as reject, treat as confirm, or block further input)?
+
+1. **What triggers first-goal creation?** *Resolved:* the session's first message that runs SYNC detection with **zero active goals** creates the initial goal (level `goal`, parent `NULL`, description = the prompt, truncated to 140 chars), no confirmation. This is the only possible trigger in practice: `detectContext` short-circuits to `'continue'` when no active goal exists, so no `'switch'`/`'ask'` decision can ever fire before a goal exists. The rule is therefore "create exactly when `getActiveGoals(sessionId)` is empty" — it happens once per session and is idempotent by construction (resuming a session that already has goals never re-creates).
+2. **Can a confirmation prompt interrupt an active LLM stream?** *Resolved:* No. The decision is produced during the SYNC step that runs **before** `responder.respond()`, so `send()` awaits the user's answer while `pendingConfirm` is rendered and keyboard input is locked; the stream begins only after y/n/esc resolves. A confirm can therefore only ever appear between turns — never mid-stream.
+3. **Dismiss default (esc / ignored)?** *Resolved:* treat as **continue on the current goal** for the flow (proceed with the send, no goal change) and contribute **no feedback** to the adaptive threshold — neither confirmed nor rejected. Non-answers must not perturb the EMA signal; blocking input is hostile; and flow-wise a dismissal is indistinguishable from "stay on topic", so continuing is the safe, lossless default.
+
+   Feedback mapping (the only door into `switch_confirmed_count` / `switch_rejected_count`, via `recordSwitchFeedback`):
+   - `'ask'` + **y** ("yes, still on this goal") → *reject the switch* → `recordSwitchFeedback(false)` → rejected++ → threshold ↓ (more sensitive).
+   - `'ask'` + **n** ("no, new topic") → *confirm the switch* → `recordSwitchFeedback(true)` → confirmed++ → threshold ↑ (less sensitive), and the active goal is superseded by a new goal from the prompt.
+   - `'ask'` + **esc** → continue on current goal, no feedback.
+   - `'switch'` → auto-supersede: pause all active goals, create a new goal from the prompt. No threshold feedback (no explicit user answer exists).
+   - Initial goal → created, no feedback.
+
+   `'switch'` and `'ask'`+n both create a **flat topic history**: the superseded goal is `paused`, not deleted, and every auto-created goal is level `goal` with parent `NULL` (the existing goal-hierarchy tables stay available for manual sub-goals — Phase 8 only auto-tracks topics). Goal rows are created synchronously (cheap); the goal's embedding is stored fire-and-forget with the ASYNC embedding budget so SYNC detection stays within its hard timeout. A goal that has no vector yet (embedding still in flight or failed) leaves `goalEvaluated === false` so `detectContext`'s degenerate `similarity=0 => switch` case is coerced to `'continue'` by the pipeline — a goal without a vector must never cascade into spurious goal churn.
 
 **Verify**: Have two clearly different conversations in one session back-to-back; the second one triggers an 'ask' or 'switch' decision and the TUI surfaces it correctly. Confirm/reject a few times and verify `user_settings.similarity_threshold` actually moves via the adaptive EMA (previously untestable end-to-end since nothing fed it real answers).
 

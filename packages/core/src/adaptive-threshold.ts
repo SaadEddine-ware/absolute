@@ -110,6 +110,17 @@ export function resetThreshold(
   ).run(DEFAULT_THRESHOLD, now, userId);
 }
 
+// The single call site for user switch feedback (the Phase 8 confirmation
+// flow). Named for intent: it records whether the user CONFIRMED a topic
+// switch, then updates the adaptive EMA threshold accordingly.
+export function recordSwitchFeedback(
+  db: Database.Database,
+  userConfirmedSwitch: boolean,
+  userId: string = DEFAULT_USER_ID
+): UserSettings {
+  return updateAdaptiveThreshold(db, userId, userConfirmedSwitch);
+}
+
 export function getDecision(
   similarity: number,
   threshold: number

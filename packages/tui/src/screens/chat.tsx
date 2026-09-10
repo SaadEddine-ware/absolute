@@ -1,8 +1,10 @@
 import { Box, Text, useStdout } from 'ink';
+import type { Goal } from '@absolute/core';
 import type { ChatMessage } from '../types.js';
 import { theme } from '../styles/theme.js';
 import { Message } from '../components/message.js';
 import { Input } from '../components/input.js';
+import { ConfirmPrompt } from '../components/confirm-prompt.js';
 import { StatusBar } from '../components/status-bar.js';
 
 export interface ChatScreenProps {
@@ -15,6 +17,9 @@ export interface ChatScreenProps {
   sessionCount: number;
   onSubmit: (text: string) => void;
   onCommand: (command: string) => void;
+  /** Phase 8: non-null while send() awaits a topic-change confirmation. */
+  pendingConfirm?: { text: string; goal: Goal } | null;
+  onAnswerConfirm?: (answer: boolean | null) => void;
 }
 
 export function ChatScreen({
@@ -27,6 +32,8 @@ export function ChatScreen({
   sessionCount,
   onSubmit,
   onCommand,
+  pendingConfirm = null,
+  onAnswerConfirm,
 }: ChatScreenProps): JSX.Element {
   const { stdout } = useStdout();
   const rows = stdout.rows > 0 ? stdout.rows : 24;
@@ -57,7 +64,11 @@ export function ChatScreen({
         )}
       </Box>
 
-      <Input onSubmit={onSubmit} onCommand={onCommand} thinking={isThinking} />
+      {pendingConfirm && onAnswerConfirm ? (
+        <ConfirmPrompt prompt={pendingConfirm.text} onAnswer={onAnswerConfirm} />
+      ) : (
+        <Input onSubmit={onSubmit} onCommand={onCommand} thinking={isThinking} />
+      )}
 
       <StatusBar
         mode={mode}

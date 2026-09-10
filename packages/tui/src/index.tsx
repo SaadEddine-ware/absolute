@@ -38,6 +38,7 @@ export type { InputProps } from './components/input.js';
 export type { StatusBarProps } from './components/status-bar.js';
 export type { MemoryBadgeProps } from './components/memory-badge.js';
 export { Sidebar, SIDEBAR_ITEMS, type SidebarProps, type SidebarItem } from './components/sidebar.js';
+export { ConfirmPrompt, type ConfirmPromptProps } from './components/confirm-prompt.js';
 export { SessionsScreen, type SessionsScreenProps } from './screens/sessions.js';
 export { MemoriesScreen, type MemoriesScreenProps } from './screens/memories.js';
 export { SettingsScreen, type SettingsScreenProps } from './screens/settings.js';
@@ -47,9 +48,12 @@ export {
   buildNextMessages,
   scoreImportance,
   extractExchangeKeywords,
+  ensureInitialGoal,
+  supersedeGoals,
   SYNC_DETECT_TIMEOUT_MS,
   ASYNC_EMBED_TIMEOUT_MS,
   RECALL_TOP_K,
+  GOAL_DESC_MAX_CHARS,
   type Exchange,
   type SyncResult,
   type BuildNextMessagesInput,

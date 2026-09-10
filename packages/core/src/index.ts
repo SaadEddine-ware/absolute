@@ -81,6 +81,7 @@ export type { MigrationResult } from './migration.js';
 export {
   getUserSettings,
   updateAdaptiveThreshold,
+  recordSwitchFeedback,
   resetThreshold,
   getDecision,
   DEFAULT_THRESHOLD,

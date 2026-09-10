@@ -82,7 +82,7 @@ export function App(): JSX.Element {
     [session, summary]
   );
 
-  const { messages, send, pushSystem, clear, isThinking, mode } = useChat(getContext, {
+  const { messages, send, pushSystem, clear, isThinking, mode, pendingConfirm, answerConfirm } = useChat(getContext, {
     db,
     provider: hasSession ? embeddingProvider : null,
     onExchange: store,
@@ -187,6 +187,8 @@ export function App(): JSX.Element {
           sessionCount={sessions.length}
           onSubmit={send as (text: string) => void}
           onCommand={handleCommand}
+          pendingConfirm={pendingConfirm}
+          onAnswerConfirm={answerConfirm}
         />
       )}
 

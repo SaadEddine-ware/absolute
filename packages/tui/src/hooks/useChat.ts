@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProviderManager } from '@absolute/providers';
 import type { LLMMessage } from '@absolute/providers';
-import type { AbsoluteDatabase, EmbeddingProvider } from '@absolute/core';
+import { recordSwitchFeedback as recordSwitchFeedbackCore } from '@absolute/core';
+import type { AbsoluteDatabase, EmbeddingProvider, Goal } from '@absolute/core';
 import type { ChatMessage, ChatContext, MessageResponder } from '../types.js';
 import type { AbsoluteConfig } from '../lib/config.js';
 import { loadConfig } from '../lib/config.js';
 import {
   buildNextMessages,
   detectSessionContext,
+  supersedeGoals,
   MAX_HISTORY_TURNS,
   type Exchange,
 } from '../lib/memory-pipeline.js';
@@ -88,6 +90,10 @@ export interface UseChatResult {
   isThinking: boolean;
   /** Display label for the active responder: the provider id or 'stub'. */
   mode: string;
+  /** Phase 8 hybrid confirmation: prompt text shown while send() awaits an answer. */
+  pendingConfirm: { text: string; goal: Goal } | null;
+  /** Resolve an active confirmation: true=still on goal, false=switched, null=dismiss. */
+  answerConfirm: (answer: boolean | null) => void;
 }
 
 export interface ResolvedResponder {
@@ -144,6 +150,25 @@ export function useChat(
   const realResponderRef = useRef(false);
   const configRef = useRef<AbsoluteConfig>({});
 
+  // Phase 8: hybrid confirmation. send() suspends on an 'ask' decision until
+  // the user answers y/n/esc; answerConfirm resolves the pending promise.
+  const [pendingConfirm, setPendingConfirm] = useState<{ text: string; goal: Goal } | null>(null);
+  const confirmResolveRef = useRef<((answer: boolean | null) => void) | null>(null);
+
+  const askConfirm = useCallback((text: string, goal: Goal): Promise<boolean | null> => {
+    return new Promise((resolve) => {
+      confirmResolveRef.current = resolve;
+      setPendingConfirm({ text, goal });
+    });
+  }, []);
+
+  const answerConfirm = useCallback((answer: boolean | null): void => {
+    const resolve = confirmResolveRef.current;
+    confirmResolveRef.current = null;
+    setPendingConfirm(null);
+    resolve?.(answer);
+  }, []);
+
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
@@ -160,6 +185,13 @@ export function useChat(
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  const pushSystem = useCallback((text: string) => {
+    setMessages((m) => [
+      ...m,
+      { id: nextMessageId(), role: 'system', text, ts: new Date().toISOString() },
+    ]);
   }, []);
 
   const send = useCallback(
@@ -206,15 +238,42 @@ export function useChat(
 
       // [SYNC] detect context before the LLM call and build the message list
       // (system prompt with recalled memories + recent history + user prompt).
+      // Phase 8: goal tracking — the pipeline anchors/supersedes goals, and an
+      // 'ask' decision suspends here (before any stream starts) for a y/n/esc
+      // confirmation of the topic change.
       let llmMessages: LLMMessage[] = [{ role: 'user', content: trimmed }];
       if (options.db && options.provider && sessionId && sessionId !== 'none') {
+        const db = options.db;
+        const provider = options.provider;
         const config = configRef.current;
-        const sync = await detectSessionContext(
-          options.db,
-          options.provider,
-          trimmed,
-          sessionId
-        );
+        const sync = await detectSessionContext(db, provider, trimmed, sessionId);
+
+        if (sync.goalCreated && sync.goal) {
+          const action =
+            sync.goalAction === 'switched'
+              ? `New goal: ${sync.goal.description}`
+              : `Tracking goal: ${sync.goal.description}`;
+          pushSystem(action);
+        }
+
+        if (sync.decision === 'ask' && sync.goal) {
+          const answer = await askConfirm(
+            `Still working on "${sync.goal.description}"?`,
+            sync.goal
+          );
+          if (answer === false) {
+            // "no, moved on" — confirmed switch: new goal, feed the threshold.
+            recordSwitchFeedbackCore(db.db, true);
+            const { goal } = await supersedeGoals(db, provider, trimmed, sessionId);
+            pushSystem(`Switched to new goal: ${goal.description}`);
+          } else if (answer === true) {
+            // "yes, still on it" — rejected switch: feed the threshold.
+            recordSwitchFeedbackCore(db.db, false);
+            pushSystem(`Continuing goal: ${sync.goal.description}`);
+          }
+          // null (esc) -> continue on the current goal, NO threshold feedback.
+        }
+
         llmMessages = buildNextMessages({
           prompt: trimmed,
           sessionContext: sync.sessionContext,
@@ -259,17 +318,10 @@ export function useChat(
         }
       }
     },
-    [responder, getContext, options.db, options.provider, options.onExchange, mode]
+    [responder, getContext, options.db, options.provider, options.onExchange, mode, askConfirm, pushSystem]
   );
 
   const clear = useCallback(() => setMessages([]), []);
 
-  const pushSystem = useCallback((text: string) => {
-    setMessages((m) => [
-      ...m,
-      { id: nextMessageId(), role: 'system', text, ts: new Date().toISOString() },
-    ]);
-  }, []);
-
-  return { messages, send, clear, pushSystem, isThinking, mode };
+  return { messages, send, clear, pushSystem, isThinking, mode, pendingConfirm, answerConfirm };
 }
