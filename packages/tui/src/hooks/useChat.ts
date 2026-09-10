@@ -94,6 +94,10 @@ export interface UseChatResult {
   pendingConfirm: { text: string; goal: Goal } | null;
   /** Resolve an active confirmation: true=still on goal, false=switched, null=dismiss. */
   answerConfirm: (answer: boolean | null) => void;
+  /** Phase 9: whether hybrid confirmation is armed ('ask: on/off' in the sidebar). */
+  confirmEnabled: boolean;
+  /** Flip confirmEnabled (sidebar 'ask: on/off' toggle). */
+  toggleConfirm: () => void;
 }
 
 export interface ResolvedResponder {
@@ -154,6 +158,14 @@ export function useChat(
   // the user answers y/n/esc; answerConfirm resolves the pending promise.
   const [pendingConfirm, setPendingConfirm] = useState<{ text: string; goal: Goal } | null>(null);
   const confirmResolveRef = useRef<((answer: boolean | null) => void) | null>(null);
+
+  // Phase 9: 'ask: on/off' toggle, surfaced in the technical sidebar.
+  const [confirmEnabled, setConfirmEnabled] = useState(true);
+  const confirmEnabledRef = useRef(true);
+  useEffect(() => {
+    confirmEnabledRef.current = confirmEnabled;
+  }, [confirmEnabled]);
+  const toggleConfirm = useCallback(() => setConfirmEnabled((v) => !v), []);
 
   const askConfirm = useCallback((text: string, goal: Goal): Promise<boolean | null> => {
     return new Promise((resolve) => {
@@ -256,7 +268,7 @@ export function useChat(
           pushSystem(action);
         }
 
-        if (sync.decision === 'ask' && sync.goal) {
+        if (sync.decision === 'ask' && sync.goal && confirmEnabledRef.current) {
           const answer = await askConfirm(
             `Still working on "${sync.goal.description}"?`,
             sync.goal
@@ -323,5 +335,16 @@ export function useChat(
 
   const clear = useCallback(() => setMessages([]), []);
 
-  return { messages, send, clear, pushSystem, isThinking, mode, pendingConfirm, answerConfirm };
+  return {
+    messages,
+    send,
+    clear,
+    pushSystem,
+    isThinking,
+    mode,
+    pendingConfirm,
+    answerConfirm,
+    confirmEnabled,
+    toggleConfirm,
+  };
 }

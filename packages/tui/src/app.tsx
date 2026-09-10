@@ -1,19 +1,26 @@
 import { Box, Text, useApp, useInput } from 'ink';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { homedir } from 'node:os';
 import { useSession } from './hooks/useSession.js';
 import { useChat } from './hooks/useChat.js';
 import { useMemory } from './hooks/useMemory.js';
+import { useTerminalSize } from './hooks/useTerminalSize.js';
 import { ChatScreen } from './screens/chat.js';
 import { SessionsScreen } from './screens/sessions.js';
 import { MemoriesScreen } from './screens/memories.js';
 import { SettingsScreen } from './screens/settings.js';
 import { Sidebar } from './components/sidebar.js';
+import { SidebarInfo } from './components/sidebar-info.js';
 import type { ChatContext, Screen } from './types.js';
 import { theme } from './styles/theme.js';
-import { loadConfig } from './lib/config.js';
+import { loadConfig, getDataDir } from './lib/config.js';
 import { createAnyProvider } from './lib/embedding.js';
 
 const TAB_ORDER: Screen[] = ['chat', 'sessions', 'memories', 'settings'];
+
+// Below this terminal width the right technical sidebar is hidden entirely so
+// the chat column keeps full width on narrow terminals.
+const COMPACT_WIDTH = 60;
 
 const HELP = [
   '/help    show this help',
@@ -24,11 +31,15 @@ const HELP = [
   '/quit    exit (or ctrl-c)',
   '',
   'Navigation: ctrl+t chat · ctrl+l sessions · ctrl+r memories · ctrl+e settings · tab cycles',
+  '',
+  'ctrl+g   toggle the hybrid topic-confirm prompt (sidebar "ask: on/off")',
 ].join('\n');
 
 export function App(): JSX.Element {
   const { exit } = useApp();
   const [view, setView] = useState<Screen>('chat');
+  // Read before the early status returns so the hook order is stable.
+  const { columns } = useTerminalSize();
   const {
     status,
     db,
@@ -45,10 +56,21 @@ export function App(): JSX.Element {
   // switch, so it must be state (not a module-level memo).
   const [embeddingProvider, setEmbeddingProvider] = useState(() => createAnyProvider(loadConfig()));
 
+  // Technical sidebar data (sidebar-info.tsx): session token budget, the data
+  // directory shown home-relative, and the configured LLM model label.
+  const config = loadConfig();
+  const budgetTokens = config.memory?.maxTokensPerSession ?? 8000;
+  const sessionPath = useMemo(() => getDataDir().replace(homedir(), '~'), []);
+  const modelLabel = config.model ?? '';
+
   // Global navigation. Fires alongside screen-level handlers; only reacts to
   // the view keys, never to plain typing.
   useInput((input, key) => {
     if (key.ctrl) {
+      if (input === 'g') {
+        toggleConfirm();
+        return;
+      }
       const map: Record<string, Screen> = {
         t: 'chat',
         l: 'sessions',
@@ -82,7 +104,7 @@ export function App(): JSX.Element {
     [session, summary]
   );
 
-  const { messages, send, pushSystem, clear, isThinking, mode, pendingConfirm, answerConfirm } = useChat(getContext, {
+  const { messages, send, pushSystem, clear, isThinking, mode, pendingConfirm, answerConfirm, confirmEnabled, toggleConfirm } = useChat(getContext, {
     db,
     provider: hasSession ? embeddingProvider : null,
     onExchange: store,
@@ -173,57 +195,72 @@ export function App(): JSX.Element {
   }
 
   return (
-    <Box flexDirection="row">
-      <Sidebar current={view} sessionLabel={session?.title ?? 'untitled'} />
+    <Box flexDirection="row" width="100%">
+      <Box flexDirection="row" flexGrow={1}>
+        <Sidebar current={view} sessionLabel={session?.title ?? 'untitled'} />
 
-      {view === 'chat' && (
-        <ChatScreen
-          sessionLabel={session?.title ?? 'untitled'}
-          mode={mode}
-          messages={messages}
-          isThinking={isThinking}
+        {view === 'chat' && (
+          <ChatScreen
+            sessionLabel={session?.title ?? 'untitled'}
+            messages={messages}
+            isThinking={isThinking}
+            memoryCount={summary.count}
+            memoryTokens={summary.tokensEst}
+            sessionCount={sessions.length}
+            onSubmit={send as (text: string) => void}
+            onCommand={handleCommand}
+            pendingConfirm={pendingConfirm}
+            onAnswerConfirm={answerConfirm}
+          />
+        )}
+
+        {view === 'sessions' && db && (
+          <SessionsScreen
+            sessions={sessions}
+            currentSessionId={session?.id ?? null}
+            canDelete={(s) => s.id !== session?.id}
+            onSwitch={handleSwitch}
+            onNew={handleNew}
+            onDelete={handleDelete}
+            onBack={() => setView('chat')}
+          />
+        )}
+
+        {view === 'memories' && db && (
+          <MemoriesScreen
+            db={db}
+            sessionId={session?.id ?? null}
+            onBack={() => setView('chat')}
+          />
+        )}
+
+        {view === 'settings' && db && (
+          <SettingsScreen
+            db={db}
+            onBack={() => setView('chat')}
+            onConfigChanged={handleConfigChanged}
+          />
+        )}
+
+        {view !== 'chat' && !db && (
+          <Box>
+            <Text color={theme.statusErr}>Database not ready.</Text>
+          </Box>
+        )}
+      </Box>
+
+      {columns >= COMPACT_WIDTH && db && session && (
+        <SidebarInfo
+          sessionLabel={session.title ?? 'untitled'}
+          contextTokens={summary.tokensEst}
+          budgetTokens={budgetTokens}
           memoryCount={summary.count}
           memoryTokens={summary.tokensEst}
-          sessionCount={sessions.length}
-          onSubmit={send as (text: string) => void}
-          onCommand={handleCommand}
-          pendingConfirm={pendingConfirm}
-          onAnswerConfirm={answerConfirm}
+          sessionPath={sessionPath}
+          askOn={confirmEnabled}
+          modeLabel={mode}
+          modelLabel={modelLabel}
         />
-      )}
-
-      {view === 'sessions' && db && (
-        <SessionsScreen
-          sessions={sessions}
-          currentSessionId={session?.id ?? null}
-          canDelete={(s) => s.id !== session?.id}
-          onSwitch={handleSwitch}
-          onNew={handleNew}
-          onDelete={handleDelete}
-          onBack={() => setView('chat')}
-        />
-      )}
-
-      {view === 'memories' && db && (
-        <MemoriesScreen
-          db={db}
-          sessionId={session?.id ?? null}
-          onBack={() => setView('chat')}
-        />
-      )}
-
-      {view === 'settings' && db && (
-        <SettingsScreen
-          db={db}
-          onBack={() => setView('chat')}
-          onConfigChanged={handleConfigChanged}
-        />
-      )}
-
-      {view !== 'chat' && !db && (
-        <Box>
-          <Text color={theme.statusErr}>Database not ready.</Text>
-        </Box>
       )}
     </Box>
   );

@@ -38,6 +38,11 @@ export type { InputProps } from './components/input.js';
 export type { StatusBarProps } from './components/status-bar.js';
 export type { MemoryBadgeProps } from './components/memory-badge.js';
 export { Sidebar, SIDEBAR_ITEMS, type SidebarProps, type SidebarItem } from './components/sidebar.js';
+export {
+  SidebarInfo,
+  type SidebarInfoProps,
+} from './components/sidebar-info.js';
+export { useTerminalSize, type TerminalSize } from './hooks/useTerminalSize.js';
 export { ConfirmPrompt, type ConfirmPromptProps } from './components/confirm-prompt.js';
 export { SessionsScreen, type SessionsScreenProps } from './screens/sessions.js';
 export { MemoriesScreen, type MemoriesScreenProps } from './screens/memories.js';

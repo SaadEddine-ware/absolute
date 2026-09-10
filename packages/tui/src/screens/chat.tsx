@@ -9,7 +9,6 @@ import { StatusBar } from '../components/status-bar.js';
 
 export interface ChatScreenProps {
   sessionLabel: string;
-  mode: string;
   messages: ChatMessage[];
   isThinking: boolean;
   memoryCount: number;
@@ -24,7 +23,6 @@ export interface ChatScreenProps {
 
 export function ChatScreen({
   sessionLabel,
-  mode,
   messages,
   isThinking,
   memoryCount,
@@ -70,13 +68,7 @@ export function ChatScreen({
         <Input onSubmit={onSubmit} onCommand={onCommand} thinking={isThinking} />
       )}
 
-      <StatusBar
-        mode={mode}
-        sessionLabel={sessionLabel}
-        memoryCount={memoryCount}
-        memoryTokens={memoryTokens}
-        sessionCount={sessionCount}
-      />
+      <StatusBar sessionCount={sessionCount} />
     </Box>
   );
 }
