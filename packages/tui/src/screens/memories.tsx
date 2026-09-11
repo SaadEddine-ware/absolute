@@ -7,6 +7,8 @@ export interface MemoriesScreenProps {
   db: AbsoluteDatabase;
   sessionId: string | null;
   onBack: () => void;
+  /** Vertical space reserved above the screen by an overlay. */
+  overlayHeight?: number;
 }
 
 interface MemNode {
@@ -18,9 +20,9 @@ function truncate(text: string, width: number): string {
   return text.length > width ? `${text.slice(0, Math.max(0, width - 1))}…` : text;
 }
 
-export function MemoriesScreen({ db, sessionId, onBack }: MemoriesScreenProps): JSX.Element {
+export function MemoriesScreen({ db, sessionId, onBack, overlayHeight = 0 }: MemoriesScreenProps): JSX.Element {
   const { stdout } = useStdout();
-  const rows = stdout.rows > 0 ? stdout.rows : 24;
+  const rows = Math.max(6, (stdout.rows > 0 ? stdout.rows : 24) - overlayHeight);
   const width = stdout.columns > 0 ? stdout.columns - 28 : 60;
 
   const roots = useMemo<MemNode[]>(() => {
@@ -60,6 +62,7 @@ export function MemoriesScreen({ db, sessionId, onBack }: MemoriesScreenProps): 
   }, [roots, expanded]);
 
   useInput((input, key) => {
+    if (overlayHeight > 0) return; // an overlay owns the terminal while open
     if (flat.length === 0) {
       if (input === 'q' || key.escape) onBack();
       return;

@@ -1,0 +1,33 @@
+{
+  "name": "ember",
+  "dark": {
+    "primary": "#fdba74",
+    "accent": "#f97316",
+    "user": "#fb923c",
+    "assistant": "#fbbf24",
+    "system": "#f59e0b",
+    "text": "#ffedd5",
+    "muted": "#78716c",
+    "border": "#44403c",
+    "bg": "#1c1917",
+    "statusOk": "#a3e635",
+    "statusWarn": "#facc15",
+    "statusErr": "#f87171",
+    "header": "#d6d3d1"
+  },
+  "light": {
+    "primary": "#c2410c",
+    "accent": "#ea580c",
+    "user": "#fb923c",
+    "assistant": "#b45309",
+    "system": "#d97706",
+    "text": "#292524",
+    "muted": "#78716c",
+    "border": "#d6d3d1",
+    "bg": "#fafaf9",
+    "statusOk": "#4d7c0f",
+    "statusWarn": "#a16207",
+    "statusErr": "#dc2626",
+    "header": "#57534e"
+  }
+}

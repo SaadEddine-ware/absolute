@@ -1,6 +1,17 @@
 import { readFileSync, mkdirSync, existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import type { ThemeMode } from '../styles/theme.js';
+import type { KeyAction } from './keybinds.js';
+
+export interface UiConfig {
+  /** Theme name (built-in or ~/.config/absolute/themes/<name>.json). */
+  theme?: string;
+  /** Dark/light token set to load. Defaults to 'dark'. */
+  themeMode?: ThemeMode;
+  /** Action → KeySpec overrides for the TUI keybinds. */
+  keybindings?: Partial<Record<KeyAction, string>>;
+}
 
 export interface AbsoluteConfig {
   provider?: string;
@@ -15,7 +26,24 @@ export interface AbsoluteConfig {
     maxTokensPerSession?: number;
     retentionDays?: number;
   };
+  /** Back-compat: pre-Phase-9 top-level theme name. Folded into ui.theme. */
   theme?: string;
+  ui?: UiConfig;
+}
+
+export interface ResolvedUiConfig {
+  theme: string;
+  themeMode: ThemeMode;
+  keybindings?: Partial<Record<KeyAction, string>>;
+}
+
+/** Merge the legacy top-level `theme` key into ui.theme (ui wins). */
+export function resolveUiConfig(config: AbsoluteConfig): ResolvedUiConfig {
+  return {
+    theme: config.ui?.theme ?? config.theme ?? 'slate',
+    themeMode: config.ui?.themeMode ?? 'dark',
+    keybindings: config.ui?.keybindings,
+  };
 }
 
 const CONFIG_DIR = join(homedir(), '.config', 'absolute');

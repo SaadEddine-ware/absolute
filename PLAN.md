@@ -105,7 +105,7 @@ F:\absolute\
 │           ├── components/         # message, input, status-bar
 │           ├── hooks/              # useChat, useSession, useMemory
 │           ├── lib/                # config + embedding (mirrors cli utils)
-│           └── styles/theme.ts     # custom theme tokens
+│           └── styles/theme.ts     # theme registry + built-in themes (Phase 9)
 │
 │   └── providers/                  # LLMProvider abstraction (complete, Phase 5)
 │       ├── package.json            # deps: @anthropic-ai/sdk, openai (external)
@@ -554,6 +554,46 @@ Shipped:
 
 **Verify**: Have two clearly different conversations in one session back-to-back; the second one triggers an 'ask' or 'switch' decision and the TUI surfaces it correctly. Confirm/reject a few times and verify `user_settings.similarity_threshold` actually moves via the adaptive EMA (previously untestable end-to-end since nothing fed it real answers).
 
+### Phase 9: Theme System + Configurable Keybinds + Input Ergonomics — COMPLETE
+**Goal**: Bring the three things opencode does well into ABSOLUTE: a real theme system (built-in + user JSON themes, dark/light), configurable keybinds with a chord leader / which-key affordance, and readline-style prompt editing plus a command palette, help overlay, themes picker, and chat scrollback.
+
+**Background**: Today the TUI has exactly one hardcoded theme (`packages/tui/src/styles/theme.ts` — slate/dark, 13 tokens) and hardcoded nav keys (`ctrl+t/l/r/e`, `ctrl+g`, `tab`, `y/n/esc`) with a bare `ink-text-input` prompt (no readline editing, no history). The opencode comparison (opencode.ai docs `/docs/tui`, `/docs/themes`, `/docs/keybinds`) isolated three concrete wins to adopt. ABSOLUTE keeps its own interaction model (view keys, memory sidebar, memory-as-UI, goal-confirm flow) — we borrow opencode's *mechanics*, not its *layout*.
+
+**Files to create/update**:
+- `packages/tui/src/styles/themes/slate.json`, `themes/mono.json`, `themes/ember.json` (new) + `packages/tui/src/styles/theme.ts` — becomes: `Theme` type (same 13 tokens), `builtinThemes`, `loadTheme(name, mode)`, `applyTheme(theme)` / `getTheme()`, `useThemeVersion()`, `discoverUserThemes()` reading `~/.config/absolute/themes/*.json`.
+- `packages/tui/src/lib/config.ts` — extend `AbsoluteConfig` with `ui?: { theme?, themeMode?: 'dark'|'light', keybindings?: Record<KeyAction, KeySpec> }`; reuse existing `saveConfig` for TUI-side theme persistence.
+- `packages/tui/src/lib/keybinds.ts` (new) — `KeyAction` union, `DEFAULT_KEYMAP`, `parseKeySpec()` (single key + chords like `"ctrl+x t"`), `useKeybinds()`; drives a single app-level `useInput` router.
+- `packages/tui/src/components/prompt-input.tsx` (new) — custom readline-style editor replacing `ink-text-input`; reused by the chat prompt AND the command palette.
+- `packages/tui/src/hooks/usePromptHistory.ts` (new) — per-session in-memory prompt history.
+- `packages/tui/src/components/command-palette.tsx`, `help-overlay.tsx`, `theme-picker.tsx` (new) — filterable action/slash-command picker, live keybind reference (rendered from the registry, so it reflects config), and theme list with a live sample per theme (enter applies + persists).
+- `packages/tui/src/components/input.tsx` — compose `PromptInput` + history; ctrl+c clears a non-empty line (still exits when empty).
+- `packages/tui/src/screens/chat.tsx` — scrollback: `scrollOffset` windowed over the tail-following list; pgup/pgdn page, alt-up/down line.
+- `packages/tui/src/app.tsx` — mount theme/keybind wiring, route actions (palette `ctrl+p`, help `?`, themes `ctrl+x t`, sidebar-status `ctrl+x s`), reserve overlay rows at the top of the chat column (narrows the message window while open, same pattern as `ConfirmPrompt`).
+- `packages/tui/src/lib/alt-screen.ts` (new) + `packages/tui/src/index.tsx` — **alternate-screen-buffer entry/exit**: `\x1b[?1049h` on start, `\x1b[?1049l` + cursor show (`\x1b[?25h`) on exit, including on crash/SIGINT/SIGTERM (process `exit`/`SIGINT`/`SIGTERM` handlers, also wired after `render()` resolves). This is the root cause of the "mouse leaves traces, feels unstable" feedback from manual testing and belongs with this phase's visual-stability work (theme, overlays, scrollback).
+- `packages/tui/package.json` — drop `ink-text-input`; `packages/tui/src/index.tsx` — export the new components/hooks/types.
+- docs: PLAN.md (this phase), README (themes + keybinds section). The 12 files that `import { theme }` stay unchanged.
+
+**Design questions to resolve before implementation** (answered in PLAN.md, not just in code):
+
+1. **Theme consumption: mutate the module constant or introduce React context?** *Resolved:* keep the module-level `theme` export as a *live* object mutated by `applyTheme()`, plus `useThemeVersion()` (tiny `useSyncExternalStore`) for the few dynamic surfaces (picker sample, palette). All 12 existing `import { theme }` sites keep working unchanged. A theme swap is a one-in-session event (startup or explicit picker) and `applyTheme` runs before first paint, so a full ThemeContext + `useTheme()` refactor over 12 files would buy nothing user-visible.
+
+2. **Where does theme/keybind config live?** *Resolved:* in `config.json` under a new `ui` block (`{ "ui": { "theme": "slate", "themeMode": "dark", "keybindings": { ... } } }`). The existing top-level `theme` key is folded into `ui.theme` (read back-compat). ABSOLUTE deliberately keeps one config surface — opencode splits `config.json` + `tui.json`, but our CLI set/get and TUI already converge on `config.json`. Custom themes are files in `~/.config/absolute/themes/<name>.json` (files, not flat config).
+
+3. **Dark/light resolution?** *Resolved:* every theme defines both `dark{}` and `light{}` token sets; `ui.themeMode` (default `dark`) picks at load. `"auto"` is NOT offered — terminal background detection in ink is unreliable (`COLORFGBG` sparse, querying mid-raw-mode racy), so auto-detection would silently pick wrong contrast. Documented: themes are truecolor; terminals without it roll RGB down automatically.
+
+4. **Keymap scope — action catalog + chords.** *Resolved:* one `KeyAction` union. Defaults: kept 1:1 — `ctrl+t/l/r/e` views, `ctrl+g` ask-toggle, `tab` cycler. New — `command_palette` `ctrl+p`, `help` `?` / `ctrl+h`, `themes` chord `ctrl+x t`, `sidebar_status` chord `ctrl+x s`, `scroll_page_up/down` pgup/pgdn, `scroll_line_up/down` alt+up/down. **Chords**: `KeySpec` accepts `"ctrl+x t"` (space-separated chain); the app-level handler holds a short pending state that renders a which-key hint in the status bar until resolved or a 1.5s timeout. Everything overridable via `ui.keybindings`; an invalid override for one action falls back to that action's default with a warning (never crashes). Readline editing keys are intentionally not rebindable in v1 — one grammar, standard keys.
+
+5. **Readline editing subset?** *Resolved:* emacs-style single-line editor: left/right, home/end, `ctrl+a/e` (line start/end), `ctrl+u/k` (kill to start/end), `ctrl+w` (kill word back), `alt+b/f` (word back/forward), `ctrl+d` (delete forward; no-op at end), backspace, printable insert at cursor, up/down = in-memory prompt history, Enter submits. `ctrl+c` non-empty clears the line; empty exits (opencode's habit, clean exit preserved). Multi-line / pasted newlines deferred. `ink-text-input` removed.
+
+6. **Scrollback vs history conflict?** *Resolved:* up/down in the input is *always* history; the chat list scrolls with pgup/pgdn (page) and alt+up/down (line). Window follows tail when `scrollOffset === 0`, so scrolling never fights the input.
+
+7. **Overlays in ink (no native overlay layer)?** *Resolved:* conditional Boxes mounted at the top of the chat column — flex just narrows the message window while open (the same pattern `ConfirmPrompt` already uses); scroll offset is preserved so closing restores exactly what was visible.
+
+**Verify**:
+- `typecheck --workspaces` + `build --workspaces` + core 15/15 + providers 8/8 stay green with `ink-text-input` removed.
+- Headless smokes (render() into fake stdout): theme load (valid names resolve; unknown name → slate + warning; corrupt file → slate), dark/light token selection, keybind parse (override applied; invalid override → default + warning), chord routing (`ctrl+x t` opens picks), `PromptInput` editing (insert at cursor, `ctrl+a/e/u/k/w`, `alt+b/f`, history up/down, `ctrl+c` clear vs exit), palette filter + enter, help overlay renders the configured map, scrollback math (window shifts, tail-follow at offset 0).
+- Live verify (real TTY, with the user): pick a theme and see sidebar/status recolor; rebind an action in config and confirm it takes effect next launch; exercise the readline set on a real send; confirm persisted `ui.theme` survives restart. **Move the mouse and resize the terminal while running — confirm no visual artifacts persist** (the alt-screen buffer isolated the TUI from the shell scrollback); kill with Ctrl+C mid-render and confirm the real terminal prompt returns cleanly (no stuck alt-screen state).
+
 ## Key Design Decisions
 
 1. **Memory is transparent**: The AI doesn't call memory tools. The CLI handles everything — inject context before LLM call, extract and store after response. This is why the MCP approach failed.
@@ -584,6 +624,8 @@ Shipped:
     The migration (`migration.ts`) reads `content`/`description` from every memory/goal, re-embeds with the new provider, drops+recreates vec0 tables at the new dimension **or** clears them if dimensions are unchanged, resets `user_settings.similarity_threshold` to 0.6 and zeroes switch counters (the adaptive threshold learned under the old embedding space is invalid), and updates `embedding_metadata`. The startup guard is bypassed (`skipEmbeddingValidation`) only by the maintenance flows (`migrate embeddings`, `worker set/status`) that are themselves performing the switch.
 
 11. **Embedding provider switching**: Implemented as `absolute worker set cloud <url> | local` (and surfaced by `absolute worker status`). Flow: probe the target provider (Cloudflare: probe the Worker endpoint; local: optional `--verify` real-model probe) → compare modelId + dimensions against `embedding_metadata` → if unchanged, just persist the config → if changed, show exact memory/goal counts (+ whether vec0 tables will be recreated), confirm, run migration, then persist the config (on decline/cancel, nothing is changed and the config remains on the previous provider). The TUI's planned `/embedded-config` slash command (Phase 7) will reuse the same core helpers instead of duplicating.
+
+12. **TUI feel is config-driven, and the theme/keybind config stays in one file**: ABSOLUTE borrows opencode's *mechanics* (JSON themes with dark/light, rebindable actions with a chord leader, readline editing, a palette) but keeps its own interaction model (view keys, memory sidebar, goal-confirm flow). Theme + keybinds live under a single `ui` block in `config.json` (not a split `tui.json`), custom themes are files in `~/.config/absolute/themes/`, and the theme constant components consume stays a live module-level object swapped in place by `applyTheme()` rather than a React context — a theme swap is a one-in-session event, so a 12-file refactor buys nothing. Bad theme files and bad keybind overrides degrade to defaults with a warning, never a crash.
 
 ## Verification Strategy
 

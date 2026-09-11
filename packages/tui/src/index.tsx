@@ -1,6 +1,7 @@
 import { render } from 'ink';
 import { App } from './app.js';
 import { createStubResponder } from './hooks/useChat.js';
+import { enterAltScreen } from './lib/alt-screen.js';
 
 export function runTui(): void {
   // Ink's raw-mode input requires a real terminal. `process.stdin.isTTY` is the
@@ -9,6 +10,9 @@ export function runTui(): void {
     console.error('ABSOLUTE TUI needs an interactive terminal (stdin must be a TTY).');
     process.exit(1);
   }
+  // Paint into the alternate screen buffer so the shell scrollback stays clean
+  // and no mouse/resize traces survive an exit (including SIGINT/SIGTERM).
+  enterAltScreen(process.stdout);
   try {
     render(<App />);
   } catch (e) {
@@ -19,6 +23,62 @@ export function runTui(): void {
     process.exit(1);
   }
 }
+
+export { enterAltScreen, leaveAltScreen } from './lib/alt-screen.js';
+export {
+  serializePress,
+  canonicalToken,
+  parsePressList,
+  resolveKeymap,
+  matchBinding,
+  pendingBindings,
+  chordNext,
+  DEFAULT_KEYMAP,
+  KEY_ACTIONS,
+  type KeyAction,
+  type KeyBindingDef,
+  type ResolvedBinding,
+  type InkKey,
+} from './lib/keybinds.js';
+export {
+  theme,
+  applyTheme,
+  getThemeSpec,
+  listThemes,
+  variantFor,
+  useThemeVersion,
+  getThemeVersion,
+  getAppliedTheme,
+  THEMES_DIR,
+  type Theme,
+  type ThemeMode,
+  type ThemeSpec,
+  type ThemeVariant,
+  type ThemeMeta,
+  type ApplyThemeResult,
+} from './styles/theme.js';
+export {
+  PromptInput,
+  isPromptActive,
+  type PromptInputProps,
+} from './components/prompt-input.js';
+export { usePromptHistory, type UsePromptHistoryResult } from './hooks/usePromptHistory.js';
+export {
+  CommandPalette,
+  COMMAND_PALETTE_HEIGHT,
+  type CommandPaletteProps,
+  type PaletteItem,
+} from './components/command-palette.js';
+export {
+  HelpOverlay,
+  HELP_OVERLAY_HEIGHT,
+  type HelpOverlayProps,
+} from './components/help-overlay.js';
+export {
+  ThemePicker,
+  THEMES_PICKER_HEIGHT,
+  type ThemePickerProps,
+} from './components/theme-picker.js';
 
 export { App } from './app.js';
 export { createStubResponder } from './hooks/useChat.js';

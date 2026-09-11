@@ -1,6 +1,6 @@
 import { Box, Text, useInput, useStdout } from 'ink';
-import TextInput from 'ink-text-input';
 import { useMemo, useRef, useState } from 'react';
+import { PromptInput } from '../components/prompt-input.js';
 import {
   getEmbeddingMetadata,
   getWorkerStatus,
@@ -26,6 +26,8 @@ export interface SettingsScreenProps {
   db: AbsoluteDatabase;
   onBack: () => void;
   onConfigChanged: () => void;
+  /** Vertical space reserved above the screen by an overlay. */
+  overlayHeight?: number;
 }
 
 interface ConfiguredEmbedding {
@@ -60,9 +62,9 @@ type Phase =
   | { kind: 'confirm'; text: string }
   | { kind: 'busy'; title: string };
 
-export function SettingsScreen({ db, onBack, onConfigChanged }: SettingsScreenProps): JSX.Element {
+export function SettingsScreen({ db, onBack, onConfigChanged, overlayHeight = 0 }: SettingsScreenProps): JSX.Element {
   const { stdout } = useStdout();
-  const rows = stdout.rows > 0 ? stdout.rows : 24;
+  const rows = Math.max(6, (stdout.rows > 0 ? stdout.rows : 24) - overlayHeight);
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
@@ -222,6 +224,7 @@ export function SettingsScreen({ db, onBack, onConfigChanged }: SettingsScreenPr
 
   useInput((input, key) => {
     const p = phase;
+    if (overlayHeight > 0) return; // an overlay owns the terminal while open
 
     if (p.kind === 'busy') {
       return;
@@ -397,7 +400,12 @@ export function SettingsScreen({ db, onBack, onConfigChanged }: SettingsScreenPr
             <Text color={theme.accent} bold>
               {'> '}
             </Text>
-            <TextInput value={promptValue} onChange={setPromptValue} onSubmit={handlePromptSubmit} focus />
+            <PromptInput
+              value={promptValue}
+              onChange={setPromptValue}
+              onSubmit={handlePromptSubmit}
+              isEnabled={overlayHeight === 0}
+            />
           </Box>
         </Box>
       )}

@@ -1,10 +1,11 @@
-import { Box, Text, useApp, useInput } from 'ink';
-import TextInput from 'ink-text-input';
+import { Box, Text } from 'ink';
 import { useState } from 'react';
 import { theme } from '../styles/theme.js';
+import { PromptInput } from './prompt-input.js';
+import { usePromptHistory } from '../hooks/usePromptHistory.js';
 
 export interface InputProps {
-  onSubmit: (value: string) => void;
+  onSubmit: (text: string) => void;
   onCommand: (command: string) => void;
   isEnabled?: boolean;
   placeholder?: string;
@@ -21,25 +22,18 @@ export function Input({
   thinking = false,
 }: InputProps): JSX.Element {
   const [value, setValue] = useState('');
-  const { exit } = useApp();
-
-  // Ctrl+D and Ctrl+C exit the app cleanly (Ink restores the terminal).
-  useInput((input, key) => {
-    if (key.ctrl && (input === 'c' || input === 'd')) {
-      exit();
-    }
-  });
+  const { history, push } = usePromptHistory();
 
   const handleSubmit = (v: string) => {
     const trimmed = v.trim();
     if (!trimmed) return;
+    push(trimmed);
+    setValue('');
     if (trimmed.startsWith('/')) {
       onCommand(trimmed.slice(1));
-      setValue('');
       return;
     }
     onSubmit(trimmed);
-    setValue('');
   };
 
   return (
@@ -51,11 +45,12 @@ export function Input({
         <Text color={theme.accent} bold>
           {PREFIX}{' '}
         </Text>
-        <TextInput
+        <PromptInput
           value={value}
           onChange={setValue}
           onSubmit={handleSubmit}
-          focus={isEnabled}
+          isEnabled={isEnabled}
+          history={history}
         />
       </Box>
     </Box>

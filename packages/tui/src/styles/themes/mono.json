@@ -1,0 +1,33 @@
+{
+  "name": "mono",
+  "dark": {
+    "primary": "#e5e5e5",
+    "accent": "#d4d4d4",
+    "user": "#ffffff",
+    "assistant": "#a3a3a3",
+    "system": "#737373",
+    "text": "#e5e5e5",
+    "muted": "#737373",
+    "border": "#404040",
+    "bg": "#0a0a0a",
+    "statusOk": "#a3a3a3",
+    "statusWarn": "#e5e5e5",
+    "statusErr": "#fafafa",
+    "header": "#a3a3a3"
+  },
+  "light": {
+    "primary": "#171717",
+    "accent": "#262626",
+    "user": "#000000",
+    "assistant": "#525252",
+    "system": "#737373",
+    "text": "#171717",
+    "muted": "#737373",
+    "border": "#d4d4d4",
+    "bg": "#ffffff",
+    "statusOk": "#404040",
+    "statusWarn": "#171717",
+    "statusErr": "#000000",
+    "header": "#404040"
+  }
+}

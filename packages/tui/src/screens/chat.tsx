@@ -1,4 +1,5 @@
 import { Box, Text, useStdout } from 'ink';
+import { useEffect, useState } from 'react';
 import type { Goal } from '@absolute/core';
 import type { ChatMessage } from '../types.js';
 import { theme } from '../styles/theme.js';
@@ -19,6 +20,15 @@ export interface ChatScreenProps {
   /** Phase 8: non-null while send() awaits a topic-change confirmation. */
   pendingConfirm?: { text: string; goal: Goal } | null;
   onAnswerConfirm?: (answer: boolean | null) => void;
+  /** Phase 9 scrollback: offset from the tail in messages (0 = follow). */
+  scrollOffset: number;
+  onScroll: (delta: number) => void;
+  /** Report how far the window can scroll so App can clamp. */
+  onMaxOffset: (max: number) => void;
+  /** Vertical space currently reserved above the screen by an overlay. */
+  overlayHeight?: number;
+  /** Which-key hint shown in the status bar while a chord is pending. */
+  pendingChordHint?: string;
 }
 
 export function ChatScreen({
@@ -32,11 +42,33 @@ export function ChatScreen({
   onCommand,
   pendingConfirm = null,
   onAnswerConfirm,
+  scrollOffset,
+  onScroll,
+  onMaxOffset,
+  overlayHeight = 0,
+  pendingChordHint,
 }: ChatScreenProps): JSX.Element {
   const { stdout } = useStdout();
-  const rows = stdout.rows > 0 ? stdout.rows : 24;
+  const totalRows = stdout.rows > 0 ? stdout.rows : 24;
+  const rows = Math.max(6, totalRows - overlayHeight);
   const windowSize = Math.max(3, rows - 8);
-  const visible = messages.slice(-windowSize);
+  const maxOffset = Math.max(0, messages.length - windowSize);
+
+  // Keep App's scroll clamp in sync with the computed window.
+  const [reported, setReported] = useState(maxOffset);
+  useEffect(() => {
+    if (reported !== maxOffset) {
+      setReported(maxOffset);
+      onMaxOffset(maxOffset);
+    }
+  }, [maxOffset, reported, onMaxOffset]);
+
+  // Display clamp (App's stored offset may be stale after a message count
+  // change); the window follows the tail when offset is 0.
+  const offset = Math.min(Math.max(0, scrollOffset), maxOffset);
+  const visible = messages.slice(messages.length - windowSize - offset, messages.length - offset);
+
+  const scrolled = offset > 0;
 
   return (
     <Box flexDirection="column" height={rows}>
@@ -49,6 +81,11 @@ export function ChatScreen({
             {' '}
             — neural memory CLI
           </Text>
+          {scrolled && (
+            <Text color={theme.statusWarn}>
+              {'  '}↑ scrolled (pgdn to follow)
+            </Text>
+          )}
         </Text>
       </Box>
 
@@ -65,10 +102,15 @@ export function ChatScreen({
       {pendingConfirm && onAnswerConfirm ? (
         <ConfirmPrompt prompt={pendingConfirm.text} onAnswer={onAnswerConfirm} />
       ) : (
-        <Input onSubmit={onSubmit} onCommand={onCommand} thinking={isThinking} />
+        <Input
+          onSubmit={onSubmit}
+          onCommand={onCommand}
+          thinking={isThinking}
+          isEnabled={overlayHeight === 0}
+        />
       )}
 
-      <StatusBar sessionCount={sessionCount} />
+      <StatusBar sessionCount={sessionCount} hint={pendingChordHint} />
     </Box>
   );
 }

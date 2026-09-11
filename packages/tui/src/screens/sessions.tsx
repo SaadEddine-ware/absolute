@@ -11,6 +11,8 @@ export interface SessionsScreenProps {
   onNew: () => Promise<void>;
   onDelete: (id: string) => Promise<boolean>;
   onBack: () => void;
+  /** Vertical space reserved above the screen by an overlay. */
+  overlayHeight?: number;
 }
 
 function truncate(text: string, width: number): string {
@@ -25,9 +27,10 @@ export function SessionsScreen({
   onNew,
   onDelete,
   onBack,
+  overlayHeight = 0,
 }: SessionsScreenProps): JSX.Element {
   const { stdout } = useStdout();
-  const rows = stdout.rows > 0 ? stdout.rows : 24;
+  const rows = Math.max(6, (stdout.rows > 0 ? stdout.rows : 24) - overlayHeight);
   const width = stdout.columns > 0 ? stdout.columns - 28 : 60;
 
   const [index, setIndex] = useState(0);
@@ -35,6 +38,7 @@ export function SessionsScreen({
   const [notice, setNotice] = useState<string | undefined>(undefined);
 
   useInput((input, key) => {
+    if (overlayHeight > 0) return; // an overlay owns the terminal while open
     if (confirm) {
       if (input === 'y') {
         const target = confirm;
