@@ -109,6 +109,8 @@ export { ConfirmPrompt, type ConfirmPromptProps } from './components/confirm-pro
 export { ContextEnginePanel } from './components/context-engine-panel.js';
 export { GoalPanel } from './components/goal-panel.js';
 export { Footer, type FooterProps } from './components/footer.js';
+export { ModelPicker, MODEL_PICKER_HEIGHT } from './components/model-picker.js';
+export { ConnectFlow, CONNECT_FLOW_HEIGHT } from './components/connect-flow.js';
 export { NotificationToast, useNotifications } from './components/notifications.js';
 export { SessionsScreen, type SessionsScreenProps } from './screens/sessions.js';
 export { MemoriesScreen, type MemoriesScreenProps } from './screens/memories.js';

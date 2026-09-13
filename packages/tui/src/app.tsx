@@ -22,11 +22,14 @@ import {
 } from './components/command-palette.js';
 import { HelpOverlay, HELP_OVERLAY_HEIGHT } from './components/help-overlay.js';
 import { ThemePicker, THEMES_PICKER_HEIGHT } from './components/theme-picker.js';
+import { ModelPicker, MODEL_PICKER_HEIGHT } from './components/model-picker.js';
+import { ConnectFlow, CONNECT_FLOW_HEIGHT } from './components/connect-flow.js';
 import type { ChatContext, Screen } from './types.js';
 import { theme, applyTheme, useThemeVersion, listThemes } from './styles/theme.js';
 import { loadConfig, saveConfig, resolveUiConfig, getDataDir } from './lib/config.js';
 import { isPromptActive, isAutocompleteActive } from './components/prompt-input.js';
 import { createAnyProvider } from './lib/embedding.js';
+import { ProviderManager, storeCredential, getCredential } from '@absolute/providers';
 import { getActiveGoals, getUserSettings } from '@absolute/core';
 import { getCommandRegistry, type CommandContext } from './lib/commands.js';
 import { Footer } from './components/footer.js';
@@ -48,13 +51,15 @@ const NARROW_WIDTH = 56;
 
 const MAX_CHORD_LEN = 2;
 
-type Overlay = 'none' | 'command' | 'help' | 'themes';
+type Overlay = 'none' | 'command' | 'help' | 'themes' | 'models' | 'connect';
 
 const OVERLAY_HEIGHT: Record<Overlay, number> = {
   none: 0,
   command: COMMAND_PALETTE_HEIGHT,
   help: HELP_OVERLAY_HEIGHT,
   themes: THEMES_PICKER_HEIGHT,
+  models: MODEL_PICKER_HEIGHT,
+  connect: CONNECT_FLOW_HEIGHT,
 };
 
 export function App(): JSX.Element {
@@ -111,6 +116,9 @@ export function App(): JSX.Element {
   const [embeddingProvider, setEmbeddingProvider] = useState(() => createAnyProvider(loadConfig()));
 
   const config = loadConfig();
+  const providerManager = useMemo(() => new ProviderManager(), []);
+  const allProviders = useMemo(() => providerManager.list(), [providerManager]);
+  const [connectedIds, setConnectedIds] = useState<Set<string>>(new Set());
   const budgetTokens = config.memory?.maxTokensPerSession ?? 8000;
   const sessionPath = useMemo(() => getDataDir().replace(homedir(), '~'), []);
   const modelLabel = config.model ?? '';
@@ -127,6 +135,18 @@ export function App(): JSX.Element {
   const scrollBy = useCallback((delta: number) => {
     setScrollOffset((o) => Math.max(0, Math.min(o + delta, maxOffsetRef.current)));
   }, []);
+
+  // Check which providers have stored credentials on mount
+  useEffect(() => {
+    (async () => {
+      const ids = new Set<string>();
+      for (const p of allProviders) {
+        const key = await getCredential(p.id);
+        if (key) ids.add(p.id);
+      }
+      setConnectedIds(ids);
+    })();
+  }, [allProviders]);
 
   const overlayHeight =
     overlay === 'none' ? 0 : Math.min(OVERLAY_HEIGHT[overlay], Math.max(6, rows - 8));
@@ -241,7 +261,7 @@ export function App(): JSX.Element {
           setOverlayBoth('none');
           return;
         }
-        if (action !== 'help_overlay' && action !== 'themes_picker') {
+        if (action !== 'help_overlay' && action !== 'themes_picker' && action !== 'models_picker' && action !== 'connect_flow') {
           setOverlayBoth('none');
         }
       }
@@ -275,6 +295,12 @@ export function App(): JSX.Element {
           break;
         case 'themes_picker':
           setOverlayBoth('themes');
+          break;
+        case 'models_picker':
+          setOverlayBoth('models');
+          break;
+        case 'connect_flow':
+          setOverlayBoth('connect');
           break;
         case 'sidebar_status':
           setSidebarVisible((v) => !v);
@@ -426,6 +452,8 @@ export function App(): JSX.Element {
       view_settings: 'Navigation',
       toggle_ask: 'Config',
       sidebar_status: 'Config',
+      models_picker: 'Config',
+      connect_flow: 'Config',
     };
     const fromAction = (action: KeyAction): PaletteItem => {
       const b = keymap.find((x) => x.action === action);
@@ -460,6 +488,8 @@ export function App(): JSX.Element {
       fromAction('view_settings'),
       fromAction('toggle_ask'),
       fromAction('sidebar_status'),
+      fromAction('models_picker'),
+      fromAction('connect_flow'),
       ...slashItems,
     ];
   }, [keymap, routeAction, cmdRegistry, cmdCtx]);
@@ -541,6 +571,45 @@ export function App(): JSX.Element {
                   const cur = loadConfig();
                   saveConfig({ ...cur, ui: { ...(cur.ui ?? {}), theme: name, themeMode: uiConfig.themeMode } });
                   pushSystem(`Theme: ${name} (${uiConfig.themeMode})`);
+                }}
+                onClose={() => setOverlayBoth('none')}
+              />
+            </Box>
+          )}
+          {overlay === 'models' && (
+            <Box height={overlayHeight}>
+              <ModelPicker
+                providers={allProviders}
+                activeProvider={config.provider ?? 'openai'}
+                onSelect={(providerId, model) => {
+                  const cur = loadConfig();
+                  saveConfig({ ...cur, provider: providerId, model });
+                  pushSystem(`Provider: ${providerId}/${model}`);
+                }}
+                onClose={() => setOverlayBoth('none')}
+              />
+            </Box>
+          )}
+          {overlay === 'connect' && (
+            <Box height={overlayHeight}>
+              <ConnectFlow
+                providers={allProviders}
+                connectedIds={connectedIds}
+                onStoreKey={async (providerId, key) => {
+                  await storeCredential(providerId, key);
+                  setConnectedIds((prev) => new Set(prev).add(providerId));
+                  pushSystem(`Connected ${providerId}`);
+                }}
+                onTestKey={async (providerId, key) => {
+                  const p = providerManager.get(providerId);
+                  if (!p) return { ok: false, message: `Unknown provider "${providerId}".` };
+                  await p.saveKey(key);
+                  try {
+                    const result = await providerManager.test(providerId);
+                    return result;
+                  } catch (e) {
+                    return { ok: false, message: e instanceof Error ? e.message : String(e) };
+                  }
                 }}
                 onClose={() => setOverlayBoth('none')}
               />

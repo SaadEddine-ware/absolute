@@ -18,6 +18,8 @@ export type KeyAction =
   | 'command_palette'
   | 'help_overlay'
   | 'themes_picker'
+  | 'models_picker'
+  | 'connect_flow'
   | 'sidebar_status'
   | 'scroll_page_up'
   | 'scroll_page_down'
@@ -35,6 +37,8 @@ export const KEY_ACTIONS: KeyAction[] = [
   'command_palette',
   'help_overlay',
   'themes_picker',
+  'models_picker',
+  'connect_flow',
   'sidebar_status',
   'scroll_page_up',
   'scroll_page_down',
@@ -171,6 +175,8 @@ export const DEFAULT_KEYMAP: Record<KeyAction, KeyBindingDef> = {
   command_palette: { keys: ['ctrl+p'], label: 'Command palette' },
   help_overlay: { keys: ['?', 'ctrl+h'], label: 'Help' },
   themes_picker: { keys: ['ctrl+x t'], label: 'Themes picker' },
+  models_picker: { keys: ['ctrl+x m'], label: 'Models picker' },
+  connect_flow: { keys: ['ctrl+x c'], label: 'Connect provider' },
   sidebar_status: { keys: ['ctrl+x s'], label: 'Toggle technical sidebar' },
   scroll_page_up: { keys: ['pgup'], label: 'Scroll up (page)' },
   scroll_page_down: { keys: ['pgdn'], label: 'Scroll down (page)' },

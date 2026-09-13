@@ -39,6 +39,8 @@ export interface PromptInputProps {
   onChange: (value: string) => void;
   onSubmit: (value: string) => void;
   isEnabled?: boolean;
+  /** Mask input with asterisks (for API key entry). */
+  masked?: boolean;
   /** In-memory history for up/down navigation (oldest → newest). */
   history?: string[];
   /** Called on escape (hosts like the palette use this to close). */
@@ -87,6 +89,7 @@ export function PromptInput({
   onChange,
   onSubmit,
   isEnabled = true,
+  masked = false,
   history = [],
   onEscape,
   onAutocompleteChange,
@@ -395,9 +398,9 @@ export function PromptInput({
     histIdx.current = idx;
   }
 
-  const before = value.slice(0, cursor);
-  const atCursor = value[cursor] ?? ' ';
-  const after = value.slice(cursor + 1);
+  const before = masked ? '*'.repeat(cursor) : value.slice(0, cursor);
+  const atCursor = masked ? (value[cursor] ? '*' : ' ') : (value[cursor] ?? ' ');
+  const after = masked ? '*'.repeat(value.length - cursor - 1) : value.slice(cursor + 1);
 
   return (
     <Box flexDirection="column">

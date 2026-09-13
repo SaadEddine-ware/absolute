@@ -20,7 +20,7 @@ export interface CommandContext {
   /** Switch the main view. */
   setView: (view: 'chat' | 'sessions' | 'memories' | 'goals' | 'settings') => void;
   /** Open/close an overlay. */
-  setOverlayBoth: (overlay: 'none' | 'help' | 'command' | 'themes') => void;
+  setOverlayBoth: (overlay: 'none' | 'help' | 'command' | 'themes' | 'models' | 'connect') => void;
   /** The open database (may be null during startup). */
   db: AbsoluteDatabase | null;
   /** Current session id (may be null if no session). */
@@ -296,12 +296,7 @@ const BUILTIN_COMMANDS: CommandDef[] = [
     description: 'Add or update AI provider credentials (API keys)',
     category: 'config',
     handler: (_args, ctx) => {
-      ctx.pushSystem(
-        'To configure API keys, set environment variables:\n' +
-          '  OPENAI_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY,\n' +
-          '  GEMINI_API_KEY, MIMO_API_KEY\n\n' +
-          'Or store them securely: absolute config set <provider> <key>'
-      );
+      ctx.setOverlayBoth('connect');
     },
   },
   {
@@ -309,7 +304,7 @@ const BUILTIN_COMMANDS: CommandDef[] = [
     description: 'Show available models and switch provider',
     category: 'config',
     handler: (_args, ctx) => {
-      ctx.pushSystem(`Provider: ${ctx.provider}\nModel: ${ctx.model}`);
+      ctx.setOverlayBoth('models');
     },
   },
   {
