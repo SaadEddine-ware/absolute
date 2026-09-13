@@ -46,7 +46,7 @@ export interface ResolvedUiConfig {
 /** Merge the legacy top-level `theme` key into ui.theme (ui wins). */
 export function resolveUiConfig(config: AbsoluteConfig): ResolvedUiConfig {
   return {
-    theme: config.ui?.theme ?? config.theme ?? 'slate',
+    theme: config.ui?.theme ?? config.theme ?? 'minimal',
     themeMode: config.ui?.themeMode ?? 'dark',
     keybindings: config.ui?.keybindings,
   };

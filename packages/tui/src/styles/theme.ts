@@ -5,7 +5,6 @@ import { useSyncExternalStore } from 'react';
 import slate from './themes/slate.json';
 import mono from './themes/mono.json';
 import ember from './themes/ember.json';
-import burgundy from './themes/burgundy.json';
 import minimal from './themes/minimal.json';
 
 // Theme registry. Built-in themes ship as JSON files in styles/themes; user
@@ -77,7 +76,6 @@ const TOKEN_KEYS = Object.keys({
 
 const builtinSpecs: Record<string, ThemeSpec> = {
   minimal: minimal as ThemeSpec,
-  burgundy: burgundy as ThemeSpec,
   slate: slate as ThemeSpec,
   mono: mono as ThemeSpec,
   ember: ember as ThemeSpec,

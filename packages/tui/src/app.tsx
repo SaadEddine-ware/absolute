@@ -75,6 +75,19 @@ export function App(): JSX.Element {
   const [themeName, setThemeName] = useState<string>(() =>
     applyTheme(uiConfig.theme, uiConfig.themeMode).name
   );
+
+  // Paint terminal background opaque on mount so no transparency shows through
+  useEffect(() => {
+    const hex = theme.bg;
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    // truecolor bg + clear screen + cursor home
+    process.stdout.write(`\x1b[48;2;${r};${g};${b}m\x1b[2J\x1b[H`);
+    return () => {
+      process.stdout.write('\x1b[0m');
+    };
+  }, []);
   const keymap = useMemo<ResolvedBinding[]>(
     () => resolveKeymap(uiConfig.keybindings),
     [uiConfig.keybindings]
@@ -458,7 +471,7 @@ export function App(): JSX.Element {
   const showRightPanel = !compact && sidebarVisible && db && session;
 
   return (
-    <Box flexDirection="column" width="100%">
+    <Box flexDirection="column" width="100%" height="100%">
       {/* Header bar */}
       <Box
         flexDirection="row"
