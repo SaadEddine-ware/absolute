@@ -417,20 +417,38 @@ export function App(): JSX.Element {
   );
 
   const paletteItems = useMemo<PaletteItem[]>(() => {
+    const actionCategory: Record<string, string> = {
+      command_palette: 'Navigation',
+      view_chat: 'Navigation',
+      view_sessions: 'Navigation',
+      view_memories: 'Navigation',
+      view_goals: 'Navigation',
+      view_settings: 'Navigation',
+      toggle_ask: 'Config',
+      sidebar_status: 'Config',
+    };
     const fromAction = (action: KeyAction): PaletteItem => {
       const b = keymap.find((x) => x.action === action);
       return {
         id: action,
         label: b?.label ?? action,
-        hint: b?.keysText,
+        category: actionCategory[action] ?? 'Navigation',
+        keybind: b?.keysText || undefined,
         run: () => routeAction(action),
       };
     };
     // Build slash commands from the registry
+    const catLabel: Record<string, string> = {
+      session: 'Session',
+      memory: 'Memory',
+      navigation: 'Navigation',
+      config: 'Config',
+      user: 'Commands',
+    };
     const slashItems: PaletteItem[] = cmdRegistry.list().map((cmd) => ({
       id: `/${cmd.name}`,
       label: `/${cmd.name} — ${cmd.description}`,
-      hint: cmd.category,
+      category: catLabel[cmd.category] ?? 'Commands',
       run: () => void cmdRegistry.execute(`/${cmd.name}`, cmdCtx),
     }));
     return [
