@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "better-sqlite3": "^11.0.0",
+    "better-sqlite3": "^13.0.0",
     "sqlite-vec": "^0.1.0",
     "uuid": "^10.0.0"
   },

@@ -159,7 +159,7 @@ export function getMemoryContext(
   return { memory, children, depth };
 }
 
-function extractKeywords(text: string): string[] {
+export function extractKeywords(text: string): string[] {
   const stopWords = new Set([
     'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
     'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',

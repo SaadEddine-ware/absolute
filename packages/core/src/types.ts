@@ -117,3 +117,17 @@ export interface GoalHeader {
   status: Goal['status'];
   child_count: number;
 }
+
+/** Configuration for customizing the system prompt. */
+export interface SystemPromptConfig {
+  /** Full template override. Use {{goals}}, {{memories}}, {{recalled}}, {{instructions}}, {{provider}}, {{model}} as variables. */
+  template?: string;
+  /** Override the identity line ("You are ABSOLUTE..."). */
+  identity?: string;
+  /** Override the instructions section. */
+  instructions?: string;
+  /** Text prepended before the system prompt. */
+  prefix?: string;
+  /** Text appended after the system prompt. */
+  suffix?: string;
+}

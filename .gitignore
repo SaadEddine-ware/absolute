@@ -8,3 +8,7 @@ dist/
 !.env.example
 *.log
 .DS_Store
+
+# Planning docs
+PLAN.md
+absolute/

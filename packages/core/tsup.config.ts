@@ -8,6 +8,8 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   splitting: false,
+  noExternal: [],
+  external: ['@huggingface/transformers'],
   onSuccess: async () => {
     cpSync('src/migrations', 'dist/migrations', { recursive: true });
   },

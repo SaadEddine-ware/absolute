@@ -85,3 +85,12 @@ export function deleteSession(
   const result = db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
   return result.changes > 0;
 }
+
+export function updateSessionTokensUsed(
+  db: Database.Database,
+  id: string,
+  tokensUsed: number
+): void {
+  db.prepare('UPDATE sessions SET tokens_used = ?, updated_at = ? WHERE id = ?')
+    .run(tokensUsed, new Date().toISOString(), id);
+}

@@ -220,6 +220,17 @@ export function loadSessionHeaders(
   return { headers: memories, goals, total_tokens_est: totalTokens };
 }
 
+export function storeMemoryVector(
+  db: Database.Database,
+  memoryId: string,
+  embedding: Float32Array
+): void {
+  const embeddingStr = Buffer.from(embedding.buffer).toString('base64');
+  db.prepare(
+    'INSERT OR REPLACE INTO memory_vectors (memory_id, embedding) VALUES (?, ?)'
+  ).run(memoryId, embeddingStr);
+}
+
 export function formatContextForLLM(context: SessionContext): string {
   const lines: string[] = [];
   lines.push('=== SESSION CONTEXT ===');

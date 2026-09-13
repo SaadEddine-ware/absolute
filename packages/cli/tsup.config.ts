@@ -7,4 +7,5 @@ export default defineConfig({
   clean: true,
   sourcemap: true,
   splitting: false,
+  external: ['@absolute/tui'],
 });

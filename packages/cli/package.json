@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@absolute/core": "0.1.0",
+    "@absolute/tui": "0.1.0",
     "commander": "^12.0.0"
   },
   "optionalDependencies": {

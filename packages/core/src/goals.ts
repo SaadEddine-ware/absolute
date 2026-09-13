@@ -148,6 +148,17 @@ export function getGoalHierarchy(
   return { goals, hierarchy };
 }
 
+export function storeGoalVector(
+  db: Database.Database,
+  goalId: string,
+  embedding: Float32Array
+): void {
+  const embeddingStr = Buffer.from(embedding.buffer).toString('base64');
+  db.prepare(
+    'INSERT OR REPLACE INTO goal_vectors (goal_id, embedding) VALUES (?, ?)'
+  ).run(goalId, embeddingStr);
+}
+
 export function completeGoal(
   db: Database.Database,
   id: string
