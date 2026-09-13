@@ -16,7 +16,7 @@ export function Input({
   onSubmit,
   onCommand,
   isEnabled = true,
-  placeholder = 'Type a message. /help for commands.',
+  placeholder = 'type a message. /help for commands.',
   thinking = false,
 }: InputProps): JSX.Element {
   const [value, setValue] = useState('');
@@ -36,12 +36,14 @@ export function Input({
 
   return (
     <Box flexDirection="column" marginTop={1} marginBottom={1}>
-      <Text color={theme.muted} dimColor>
-        {thinking ? '...' : placeholder}
-      </Text>
-      <Box flexDirection="row" marginTop={0}>
-        <Text color={theme.primary}>
-          {'\u203a'}{' '}
+      {!isEnabled ? null : (
+        <Text color={theme.muted} dimColor>
+          {thinking ? '...' : placeholder}
+        </Text>
+      )}
+      <Box flexDirection="row">
+        <Text color={theme.accent}>
+          {'>'}{' '}
         </Text>
         <PromptInput
           value={value}

@@ -9,11 +9,11 @@ export interface SidebarItem {
 }
 
 export const SIDEBAR_ITEMS: SidebarItem[] = [
-  { id: 'chat', label: 'Chat', keyHint: 'ctrl+t' },
-  { id: 'sessions', label: 'Sessions', keyHint: 'ctrl+l' },
-  { id: 'memories', label: 'Memories', keyHint: 'ctrl+r' },
-  { id: 'goals', label: 'Goals', keyHint: 'ctrl+g' },
-  { id: 'settings', label: 'Settings', keyHint: 'ctrl+e' },
+  { id: 'chat', label: 'chat', keyHint: 'ctrl+t' },
+  { id: 'sessions', label: 'sessions', keyHint: 'ctrl+l' },
+  { id: 'memories', label: 'memories', keyHint: 'ctrl+r' },
+  { id: 'goals', label: 'goals', keyHint: 'ctrl+g' },
+  { id: 'settings', label: 'settings', keyHint: 'ctrl+e' },
 ];
 
 interface SidebarProps {
@@ -40,14 +40,14 @@ export function Sidebar({ activeView, sessionLabel, onSelect, compact = false }:
       paddingBottom={1}
     >
       <Box marginBottom={1}>
-        <Text color={theme.primary}>
-          ABSOLUTE
+        <Text color={theme.accent}>
+          absolute
         </Text>
       </Box>
 
       {sessionLabel && (
         <Box marginBottom={1}>
-          <Text color={theme.muted}>
+          <Text color={theme.muted} dimColor>
             {sessionLabel.length > 16
               ? sessionLabel.slice(0, 14) + '..'
               : sessionLabel}
@@ -61,9 +61,9 @@ export function Sidebar({ activeView, sessionLabel, onSelect, compact = false }:
           return (
             <Box key={item.id} flexDirection="row">
               <Text
-                color={active ? theme.primary : theme.border}
+                color={active ? theme.accent : theme.border}
               >
-                {active ? '\u203a ' : '  '}
+                {active ? '\u25cf ' : '  '}
               </Text>
               <Text
                 color={active ? theme.text : theme.muted}
@@ -71,7 +71,7 @@ export function Sidebar({ activeView, sessionLabel, onSelect, compact = false }:
                 {item.label}
               </Text>
               {!compact && (
-                <Text color={theme.muted}>
+                <Text color={theme.muted} dimColor>
                   {' '}{item.keyHint}
                 </Text>
               )}
@@ -82,7 +82,7 @@ export function Sidebar({ activeView, sessionLabel, onSelect, compact = false }:
 
       <Box marginTop={1}>
         <Text color={theme.muted} dimColor>
-          tab to cycle
+          tab cycle
         </Text>
       </Box>
     </Box>

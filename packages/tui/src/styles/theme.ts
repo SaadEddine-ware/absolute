@@ -6,6 +6,7 @@ import slate from './themes/slate.json';
 import mono from './themes/mono.json';
 import ember from './themes/ember.json';
 import burgundy from './themes/burgundy.json';
+import minimal from './themes/minimal.json';
 
 // Theme registry. Built-in themes ship as JSON files in styles/themes; user
 // themes are JSON files in ~/.config/absolute/themes/<name>.json. Every theme
@@ -75,6 +76,7 @@ const TOKEN_KEYS = Object.keys({
 }) as Array<keyof ThemeVariant>;
 
 const builtinSpecs: Record<string, ThemeSpec> = {
+  minimal: minimal as ThemeSpec,
   burgundy: burgundy as ThemeSpec,
   slate: slate as ThemeSpec,
   mono: mono as ThemeSpec,
@@ -87,13 +89,13 @@ const REQUIRED_TOKEN_KEYS = [
 ] as Array<keyof ThemeVariant>;
 
 const NEW_TOKEN_DEFAULTS: Partial<ThemeVariant> = {
-  panel: '#141414',
-  surface: '#1a1a1a',
-  decisionContinue: '#6b8f6b',
-  decisionAsk: '#a38b5c',
-  decisionSwitch: '#b05050',
-  notifBg: '#1a1a1a',
-  notifBorder: '#333333',
+  panel: '#0d0d0c',
+  surface: '#0d0d0c',
+  decisionContinue: '#b4b2a9',
+  decisionAsk: '#a8465a',
+  decisionSwitch: '#a8465a',
+  notifBg: '#0d0d0c',
+  notifBorder: '#2a2a28',
 };
 
 function isVariant(v: unknown): v is ThemeVariant {
@@ -108,7 +110,7 @@ function isVariant(v: unknown): v is ThemeVariant {
 }
 
 // Live active variant. Mutated in place by applyTheme().
-export const theme: ThemeVariant = { ...builtinSpecs.burgundy.dark } as ThemeVariant;
+export const theme: ThemeVariant = { ...builtinSpecs.minimal.dark } as ThemeVariant;
 
 export interface ApplyThemeResult {
   name: string;
@@ -116,7 +118,7 @@ export interface ApplyThemeResult {
   warned?: string;
 }
 
-let applied: ApplyThemeResult = { name: 'burgundy', mode: 'dark' };
+let applied: ApplyThemeResult = { name: 'minimal', mode: 'dark' };
 let version = 0;
 const listeners = new Set<() => void>();
 
@@ -207,13 +209,13 @@ export function variantFor(spec: ThemeSpec, mode: ThemeMode): ThemeVariant {
  * no-op. Returns what was actually applied.
  */
 export function applyTheme(name?: string, mode: ThemeMode = 'dark'): ApplyThemeResult {
-  const target = name && name !== '' ? name : 'slate';
+  const target = name && name !== '' ? name : 'minimal';
   if (applied.name === target && applied.mode === mode) return applied;
   const spec = getThemeSpec(target);
   let result: ApplyThemeResult;
   if (!spec) {
-    Object.assign(theme, builtinSpecs.burgundy[mode]);
-    result = { name: 'burgundy', mode, warned: `unknown theme "${target}", falling back to burgundy` };
+    Object.assign(theme, builtinSpecs.minimal[mode]);
+    result = { name: 'minimal', mode, warned: `unknown theme "${target}", falling back to minimal` };
     if (typeof process !== 'undefined' && process.stderr) {
       process.stderr.write(`[absolute] ${result.warned}\n`);
     }

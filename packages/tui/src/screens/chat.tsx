@@ -6,7 +6,6 @@ import { theme } from '../styles/theme.js';
 import { Message } from '../components/message.js';
 import { Input } from '../components/input.js';
 import { ConfirmPrompt } from '../components/confirm-prompt.js';
-import { StatusBar } from '../components/status-bar.js';
 
 export interface ChatScreenProps {
   sessionLabel: string;
@@ -66,12 +65,9 @@ export function ChatScreen({
     <Box flexDirection="column" height={rows}>
       <Box paddingX={1} marginBottom={1}>
         <Text>
-          <Text color={theme.primary}>
-            ABSOLUTE
-          </Text>
           {scrolled && (
-            <Text color={theme.statusWarn} dimColor>
-              {'  '}\u2191 scrolled
+            <Text color={theme.muted} dimColor>
+              {'\u2191 '}
             </Text>
           )}
         </Text>
@@ -97,8 +93,6 @@ export function ChatScreen({
           isEnabled={overlayHeight === 0}
         />
       )}
-
-      <StatusBar sessionCount={sessionCount} hint={pendingChordHint} />
     </Box>
   );
 }

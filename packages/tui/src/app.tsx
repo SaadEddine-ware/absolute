@@ -29,6 +29,7 @@ import { isPromptActive, isAutocompleteActive } from './components/prompt-input.
 import { createAnyProvider } from './lib/embedding.js';
 import { getActiveGoals, getUserSettings } from '@absolute/core';
 import { getCommandRegistry, type CommandContext } from './lib/commands.js';
+import { Footer } from './components/footer.js';
 import {
   serializePress,
   matchBinding,
@@ -462,15 +463,14 @@ export function App(): JSX.Element {
       <Box
         flexDirection="row"
         justifyContent="space-between"
-        borderStyle="single"
-        borderBottom={true}
-        borderColor={theme.border}
         paddingX={1}
       >
-        <Text color={theme.primary}>ABSOLUTE</Text>
-        <Text color={theme.muted} dimColor>{'  '}{config.provider ?? 'openai'} · {config.model ?? 'gpt-4o'}</Text>
-        <Text color={theme.accent}>
-          {contextEngine.state.detecting ? '...' : contextEngine.state.decision.toUpperCase()}
+        <Text color={theme.accent}>absolute</Text>
+        <Text color={theme.muted}>
+          {config.provider ?? 'openai'}/{config.model ?? 'gpt-4o'}
+        </Text>
+        <Text color={theme.muted}>
+          {contextEngine.state.detecting ? '...' : contextEngine.state.decision}
         </Text>
       </Box>
 
@@ -632,23 +632,13 @@ export function App(): JSX.Element {
         onDismiss={dismissNotif}
       />
 
-      {/* Status bar */}
-      <Box
-        flexDirection="row"
-        justifyContent="space-between"
-        borderStyle="single"
-        borderTop={true}
-        borderColor={theme.border}
-        paddingX={1}
-      >
-        <Text color={theme.muted}>
-          {sessions.length} sessions
-          {session ? ` · ${session.title ?? 'untitled'}` : ''}
-        </Text>
-        <Text color={theme.muted} dimColor>
-          {pendingChordHint ?? 'ctrl-c quit · /help'}
-        </Text>
-      </Box>
+      {/* Footer */}
+      <Footer
+        connected={!!(config.provider || config.model)}
+        provider={config.provider ?? 'openai'}
+        model={config.model ?? 'gpt-4o'}
+        cwd={getDataDir()}
+      />
     </Box>
   );
 }

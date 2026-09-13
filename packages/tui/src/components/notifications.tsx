@@ -17,27 +17,24 @@ interface NotificationToastProps {
 const TOAST_LIFETIME_MS = 4000;
 const MAX_VISIBLE = 3;
 
-function kindColor(kind: Notification['kind']): string {
+function kindIcon(kind: Notification['kind']): string {
   switch (kind) {
-    case 'success': return theme.statusOk;
-    case 'warning': return theme.statusWarn;
-    case 'error': return theme.statusErr;
-    default: return theme.header;
+    case 'success': return '\u25cf';
+    case 'warning': return '\u25b3';
+    case 'error': return '\u2717';
+    default: return '\u25cf';
   }
 }
 
-function kindIcon(kind: Notification['kind']): string {
+function kindColor(kind: Notification['kind']): string {
   switch (kind) {
-    case 'success': return '\u2713';
-    case 'warning': return '\u26a0';
-    case 'error': return '\u2717';
-    default: return '\u2022';
+    case 'error': return theme.accent;
+    default: return theme.muted;
   }
 }
 
 export function NotificationToast({ notifications, onDismiss }: NotificationToastProps): JSX.Element | null {
   const visible = notifications.slice(-MAX_VISIBLE);
-
   if (visible.length === 0) return null;
 
   return (
@@ -56,14 +53,7 @@ function ToastItem({ notification, onDismiss }: { notification: Notification; on
   }, [notification.id, onDismiss]);
 
   return (
-    <Box
-      flexDirection="row"
-      borderStyle="single"
-      borderColor={theme.border}
-      paddingX={1}
-      paddingTop={0}
-      paddingBottom={0}
-    >
+    <Box flexDirection="row" paddingX={1}>
       <Text color={kindColor(notification.kind)}>
         {kindIcon(notification.kind)}{' '}
       </Text>
