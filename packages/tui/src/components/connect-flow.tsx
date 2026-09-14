@@ -65,17 +65,6 @@ export function ConnectFlow({
         setSel((s) => (s + 1) % Math.max(1, filtered.length));
         return;
       }
-      if (key.return) {
-        const item = filtered[sel] ?? filtered[0];
-        if (item) {
-          setSelectedProvider(item);
-          setStep('enter-key');
-          setQuery('');
-          setSel(0);
-          setError(null);
-        }
-        return;
-      }
     }
     void input;
   });
